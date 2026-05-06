@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://mina001abcd"]
+
+[ext_resource type="Script" path="res://scripts/mine.gd" id="1_mine0"]
+
+[node name="Mine" type="Area2D"]
+script = ExtResource("1_mine0")
