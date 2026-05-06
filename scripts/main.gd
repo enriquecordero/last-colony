@@ -852,9 +852,9 @@ func shake(strength: float) -> void:
 func _apply_station_buffs() -> void:
 	if not is_instance_valid(_fortress):
 		return
-	var has_taller    := _fortress.has_station(Fortress.StationType.TALLER)
-	var has_generator := _fortress.has_station(Fortress.StationType.GENERATOR)
-	var has_enfermeria := _fortress.has_station(Fortress.StationType.ENFERMERIA)
+	var has_taller:     bool = _fortress.has_station(Fortress.StationType.TALLER)
+	var has_generator:  bool = _fortress.has_station(Fortress.StationType.GENERATOR)
+	var has_enfermeria: bool = _fortress.has_station(Fortress.StationType.ENFERMERIA)
 
 	if is_instance_valid(_player):
 		_player.taller_active = has_taller
