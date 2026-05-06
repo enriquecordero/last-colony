@@ -97,7 +97,8 @@ var _shake:       float = 0.0
 var _bomb_count:    int  = 0
 var _grenade_count: int  = 3
 var _grenade_mode:  bool = false
-var _sats_activated: int = 0
+var _sats_activated:   int = 0
+var _caches_collected: int = 0
 
 var _biomasa:          int       = 0
 var _build_phase:      bool      = false
@@ -539,8 +540,9 @@ func _spawn_mission_objects(mission) -> void:
 				_spawn_satellite_zone(sp)
 			_spawn_map_fill(50)
 		_MissionData.ObjectiveType.COLLECT_CACHES:
+			_caches_collected = 0
 			for _i in mission.objective_count:
-				var pos := _pick_mission_obj_pos(placed)
+				var pos := _pick_cache_pos(placed)
 				placed.append(pos)
 				var cache := ResearchCache.new()
 				cache.position = pos
@@ -576,6 +578,24 @@ func _pick_mission_obj_pos(existing: Array) -> Vector2:
 			return pos
 	return BASE_POS + Vector2(650.0, 0.0).rotated(randf() * TAU)
 
+# Coloca cachés más juntos entre sí y más cercanos a la base que los objetos normales
+func _pick_cache_pos(existing: Array) -> Vector2:
+	for _i in 50:
+		var pos := Vector2(
+			randf_range(250.0, MAP_W - 250.0),
+			randf_range(250.0, MAP_H - 250.0))
+		var d := pos.distance_to(BASE_POS)
+		if d < 300.0 or d > 680.0:
+			continue
+		var ok := true
+		for ep in existing:
+			if pos.distance_to(ep) < 180.0:
+				ok = false
+				break
+		if ok:
+			return pos
+	return BASE_POS + Vector2(450.0, 0.0).rotated(randf() * TAU)
+
 func _on_satellite_activated(_sat: Node) -> void:
 	_sats_activated += 1
 	if _sats_activated >= 2:
@@ -586,8 +606,53 @@ func _on_satellite_activated(_sat: Node) -> void:
 		_mission_runtime.notify_satellite_activated()
 
 func _on_cache_collected(_cache: Node) -> void:
+	_caches_collected += 1
+	_spawn_cache_ambush(_caches_collected)
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
 		_mission_runtime.notify_cache_collected()
+
+func _spawn_cache_ambush(cache_num: int) -> void:
+	const COUNTS := [0, 18, 38, 65]
+	const HP_M   := [0.0, 1.3, 1.8, 2.8]
+	const SPD_M  := [0.0, 1.1, 1.3, 1.6]
+	var count := COUNTS[mini(cache_num, 3)]
+	var hp_m  := HP_M[mini(cache_num, 3)]
+	var spd_m := SPD_M[mini(cache_num, 3)]
+	match cache_num:
+		1: _hud.announce_wave(_wave, "¡SEÑAL DETECTADA — HOSTILES EN CAMINO!")
+		2: _hud.announce_wave(_wave, "¡MÚLTIPLES HOSTILES — PREPÁRENSE!")
+		_: _hud.announce_wave(_wave, "¡OLEADA MASIVA — AGUANTEN!")
+	shake(5.0 * cache_num)
+	for i in count:
+		await get_tree().create_timer(0.07 * i).timeout
+		if not is_instance_valid(self) or not _mission_active:
+			return
+		var e: CharacterBody2D
+		var r := randf()
+		if cache_num >= 3:
+			if   r < 0.30: e = BLINDADO_SCENE.instantiate()
+			elif r < 0.58: e = ESCUPIDOR_SCENE.instantiate()
+			elif r < 0.73: e = SALTADORA_SCENE.instantiate()
+			else:          e = LARVA_SCENE.instantiate()
+		elif cache_num >= 2:
+			if   r < 0.15: e = BLINDADO_SCENE.instantiate()
+			elif r < 0.38: e = ESCUPIDOR_SCENE.instantiate()
+			elif r < 0.52: e = SALTADORA_SCENE.instantiate()
+			else:          e = LARVA_SCENE.instantiate()
+		else:
+			if   r < 0.25: e = ESCUPIDOR_SCENE.instantiate()
+			elif r < 0.42: e = SALTADORA_SCENE.instantiate()
+			else:          e = LARVA_SCENE.instantiate()
+		e.max_hp           = maxi(e.max_hp, int(float(e.max_hp) * hp_m))
+		e.hp               = e.max_hp
+		e.speed           *= spd_m
+		e.player           = _player
+		e.base_pos         = BASE_POS
+		e.bullet_container = _bullets
+		if "fortress" in e: e.fortress = _fortress
+		e.died.connect(_on_enemy_died)
+		e.position         = _pick_spawn_pos()
+		_enemies.add_child(e)
 
 func _spawn_boss() -> void:
 	_boss                  = Engendro.new()
@@ -1068,6 +1133,11 @@ func _is_beacon_mission() -> bool:
 		and _mission_runtime.mission != null \
 		and _mission_runtime.mission.objective_type == _MissionData.ObjectiveType.ACTIVATE_BEACONS
 
+func _is_cache_mission() -> bool:
+	return _mission_runtime != null and is_instance_valid(_mission_runtime) \
+		and _mission_runtime.mission != null \
+		and _mission_runtime.mission.objective_type == _MissionData.ObjectiveType.COLLECT_CACHES
+
 func _start_mission() -> void:
 	_wave           += 1
 	_mission_active  = true
@@ -1078,6 +1148,8 @@ func _start_mission() -> void:
 	shake(4.0)
 	if _is_beacon_mission():
 		_hud.announce_wave(_wave, "ACTIVA AMBOS SATÉLITES")
+	elif _is_cache_mission():
+		_hud.announce_wave(_wave, "RECOGE LAS CACHÉS DE INVESTIGACIÓN")
 	else:
 		_hud.announce_wave(_wave, "OLEADA %d" % _wave)
 		_spawn_wave()
@@ -1138,7 +1210,7 @@ func _spawn_wave() -> void:
 func _tick_mission(_delta: float) -> void:
 	if not _mission_active or _game_over:
 		return
-	if _is_beacon_mission():
+	if _is_beacon_mission() or _is_cache_mission():
 		return
 	if _killed > 0 and _enemies.get_child_count() == 0:
 		_on_wave_complete()
