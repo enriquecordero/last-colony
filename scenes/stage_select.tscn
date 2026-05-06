@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://c5mn8xqr2t7pa"]
+
+[ext_resource type="Script" path="res://scripts/stage_select_screen.gd" id="1_select"]
+
+[node name="StageSelectScreen" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_select")
