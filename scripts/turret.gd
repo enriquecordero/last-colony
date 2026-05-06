@@ -45,7 +45,7 @@ func _find_target() -> Node2D:
 	if not is_instance_valid(enemies_node):
 		return null
 	var lvl  := clampi(elevation_level, 0, 3)
-	var rng  := BASE_RANGE * ELEV_RANGE_MULT[lvl]
+	var rng: float = BASE_RANGE * float(ELEV_RANGE_MULT[lvl])
 	var rng2 := rng * rng
 	var best: Node2D = null
 	var best_d := rng2

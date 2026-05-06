@@ -77,14 +77,16 @@ func _build_card(mission) -> void:
 	add_child(card)
 	_card_panels[mission.id] = card
 
-	var tint       := ColorRect.new()
-	tint.size       = Vector2(CARD_W, CARD_H)
-	tint.color      = Color(col.r, col.g, col.b, 0.07)
+	var tint         := ColorRect.new()
+	tint.size         = Vector2(CARD_W, CARD_H)
+	tint.color        = Color(col.r, col.g, col.b, 0.07)
+	tint.mouse_filter = MOUSE_FILTER_IGNORE
 	card.add_child(tint)
 
-	var bar   := ColorRect.new()
-	bar.size   = Vector2(4, CARD_H)
-	bar.color  = col
+	var bar         := ColorRect.new()
+	bar.size         = Vector2(4, CARD_H)
+	bar.color        = col
+	bar.mouse_filter = MOUSE_FILTER_IGNORE
 	card.add_child(bar)
 
 	var name_lbl := _lbl(mission.display_name.to_upper(), 16, col)
