@@ -926,27 +926,41 @@ func _start_mission() -> void:
 				_spawn_boss()
 
 func _spawn_wave() -> void:
-	var hp_mult  := 1.0 + (_wave - 1) * 0.22
-	var base_spd := 85.0 + (_wave - 1) * 16.0
-	var count    := 14 + _wave * 4
 	var is_survival: bool = _mission_runtime != null and is_instance_valid(_mission_runtime) \
 		and _mission_runtime.mission != null \
 		and _mission_runtime.mission.type == _MissionData.MissionType.SURVIVAL
-	if is_survival:
-		count = int(count * 3.5)
+
+	# SURVIVAL: overwhelm — necesitas torres, minas y NPCs para sobrevivir
+	var hp_mult:  float = 1.0 + (_wave - 1) * (0.45 if is_survival else 0.28)
+	var base_spd: float = (105.0 + (_wave - 1) * 22.0) if is_survival else (90.0 + (_wave - 1) * 18.0)
+	var count:    int   = (40 + _wave * 20) if is_survival else (18 + _wave * 6)
+	var interval: float = 0.055 if is_survival else 0.17
+
 	for i in count:
-		await get_tree().create_timer(0.25 * i).timeout
+		await get_tree().create_timer(interval * i).timeout
 		if not _mission_active or not is_instance_valid(self):
 			return
 		var e: CharacterBody2D
-		if _wave >= 4 and randf() < 0.15:
-			e = BLINDADO_SCENE.instantiate(); e.speed = base_spd * 0.55
-		elif _wave >= 2 and randf() < 0.28:
-			e = ESCUPIDOR_SCENE.instantiate(); e.speed = base_spd * 0.85
-		elif _wave >= 2 and randf() < 0.35:
-			e = SALTADORA_SCENE.instantiate(); e.speed = base_spd * 1.9
+		if is_survival:
+			var r := randf()
+			if _wave >= 2 and r < 0.22:
+				e = BLINDADO_SCENE.instantiate();   e.speed = base_spd * 0.55
+			elif r < 0.32:
+				e = ESCUPIDOR_SCENE.instantiate();  e.speed = base_spd * 0.85
+			elif r < 0.55:
+				e = SALTADORA_SCENE.instantiate();  e.speed = base_spd * 1.9
+			else:
+				e = LARVA_SCENE.instantiate();      e.speed = base_spd
 		else:
-			e = LARVA_SCENE.instantiate(); e.speed = base_spd
+			var r := randf()
+			if _wave >= 4 and r < 0.15:
+				e = BLINDADO_SCENE.instantiate();   e.speed = base_spd * 0.55
+			elif _wave >= 2 and r < 0.28:
+				e = ESCUPIDOR_SCENE.instantiate();  e.speed = base_spd * 0.85
+			elif _wave >= 2 and r < 0.35:
+				e = SALTADORA_SCENE.instantiate();  e.speed = base_spd * 1.9
+			else:
+				e = LARVA_SCENE.instantiate();      e.speed = base_spd
 		e.max_hp           = maxi(e.max_hp, int(float(e.max_hp) * hp_mult))
 		e.hp               = e.max_hp
 		e.player           = _player
