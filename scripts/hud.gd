@@ -521,6 +521,12 @@ func update_grenade(count: int, active: bool) -> void:
 func init_minimap(p: Node2D, en: Node2D, fr: Node2D, base: Vector2, m_w: float, m_h: float) -> void:
 	_minimap.init(p, en, fr, base, m_w, m_h)
 
+func set_minimap_visible(v: bool) -> void:
+	_minimap.visible = v
+
+func set_satellite_revealed(v: bool) -> void:
+	_minimap.set_satellite_revealed(v)
+
 func set_minimap_threat(dir: Vector2) -> void:
 	_minimap.set_threat_dir(dir)
 

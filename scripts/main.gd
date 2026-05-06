@@ -97,6 +97,7 @@ var _shake:       float = 0.0
 var _bomb_count:    int  = 0
 var _grenade_count: int  = 3
 var _grenade_mode:  bool = false
+var _sats_activated: int = 0
 
 var _biomasa:          int       = 0
 var _build_phase:      bool      = false
@@ -446,6 +447,68 @@ func _spawn_pre_populate(count: int) -> void:
 		e.position = _pick_far_spawn_pos()
 		_enemies.add_child(e)
 
+# Llena el mapa de aliens distribuidos uniformemente (fondo de la misión satélite)
+func _spawn_map_fill(count: int) -> void:
+	for _i in count:
+		var e = LARVA_SCENE.instantiate()
+		e.speed            = randf_range(60.0, 90.0)
+		e.max_hp           = 12
+		e.hp               = 12
+		e.player           = _player
+		e.base_pos         = BASE_POS
+		e.bullet_container = _bullets
+		if "fortress" in e: e.fortress = _fortress
+		e.died.connect(_on_enemy_died)
+		for _j in 20:
+			var p := Vector2(randf_range(150.0, MAP_W - 150.0),
+				randf_range(150.0, MAP_H - 150.0))
+			if p.distance_to(BASE_POS) > 350.0:
+				e.position = p
+				break
+		_enemies.add_child(e)
+
+# Spawn zona de dificultad alrededor de un satélite:
+#   0–160px  → blindados + escupidores, 3× HP, rápidos
+#   160–360px → mix variado, 2× HP
+#   360–600px → larvas+saltadoras, 1.5× HP
+func _spawn_satellite_zone(sat_pos: Vector2) -> void:
+	var zones := [
+		{"min_r": 0.0,   "max_r": 160.0, "count": 8,  "hp_m": 3.0, "spd_m": 1.4, "heavy": true},
+		{"min_r": 160.0, "max_r": 360.0, "count": 18, "hp_m": 2.0, "spd_m": 1.2, "heavy": false},
+		{"min_r": 360.0, "max_r": 620.0, "count": 25, "hp_m": 1.5, "spd_m": 1.0, "heavy": false},
+	]
+	for z in zones:
+		for _i in int(z["count"]):
+			var angle := randf() * TAU
+			var dist  := randf_range(float(z["min_r"]), float(z["max_r"]))
+			var pos   := sat_pos + Vector2(cos(angle), sin(angle)) * dist
+			pos = pos.clamp(Vector2(150, 150), Vector2(MAP_W - 150, MAP_H - 150))
+			if pos.distance_to(BASE_POS) < 300.0:
+				continue
+			var e: CharacterBody2D
+			if z["heavy"]:
+				if randf() < 0.5:
+					e = BLINDADO_SCENE.instantiate()
+				else:
+					e = ESCUPIDOR_SCENE.instantiate()
+			else:
+				if randf() < 0.35:
+					e = SALTADORA_SCENE.instantiate()
+				elif randf() < 0.25:
+					e = ESCUPIDOR_SCENE.instantiate()
+				else:
+					e = LARVA_SCENE.instantiate()
+			e.max_hp           = maxi(e.max_hp, int(float(e.max_hp) * float(z["hp_m"])))
+			e.hp               = e.max_hp
+			e.speed           *= float(z["spd_m"])
+			e.player           = _player
+			e.base_pos         = BASE_POS
+			e.bullet_container = _bullets
+			if "fortress" in e: e.fortress = _fortress
+			e.died.connect(_on_enemy_died)
+			e.position = pos
+			_enemies.add_child(e)
+
 func _pick_far_spawn_pos() -> Vector2:
 	for _i in 30:
 		var pos := Vector2(
@@ -459,13 +522,22 @@ func _spawn_mission_objects(mission) -> void:
 	var placed: Array = []
 	match mission.objective_type:
 		_MissionData.ObjectiveType.ACTIVATE_BEACONS:
-			for _i in mission.objective_count:
-				var pos := _pick_mission_obj_pos(placed)
-				placed.append(pos)
+			# Satélites en extremos opuestos del mapa, lejos de la base
+			var sat_positions: Array[Vector2] = [
+				Vector2(clamp(BASE_POS.x - 820.0, 200.0, MAP_W - 200.0),
+					clamp(BASE_POS.y - 580.0, 200.0, MAP_H - 200.0)),  # NW
+				Vector2(clamp(BASE_POS.x + 820.0, 200.0, MAP_W - 200.0),
+					clamp(BASE_POS.y + 580.0, 200.0, MAP_H - 200.0)),  # SE
+			]
+			_sats_activated = 0
+			_hud.set_minimap_visible(false)
+			for sp in sat_positions:
 				var sat := Satellite.new()
-				sat.position = pos
+				sat.position = sp
 				sat.activated.connect(_on_satellite_activated)
 				_mission_objects.add_child(sat)
+				_spawn_satellite_zone(sp)
+			_spawn_map_fill(50)
 		_MissionData.ObjectiveType.COLLECT_CACHES:
 			for _i in mission.objective_count:
 				var pos := _pick_mission_obj_pos(placed)
@@ -505,6 +577,11 @@ func _pick_mission_obj_pos(existing: Array) -> Vector2:
 	return BASE_POS + Vector2(650.0, 0.0).rotated(randf() * TAU)
 
 func _on_satellite_activated(_sat: Node) -> void:
+	_sats_activated += 1
+	if _sats_activated >= 2:
+		_hud.set_minimap_visible(true)
+		_hud.set_satellite_revealed(true)
+		_hud.announce_wave(_wave, "COMUNICACIONES RESTAURADAS")
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
 		_mission_runtime.notify_satellite_activated()
 
@@ -986,6 +1063,11 @@ func _on_grenade_exploded(pos: Vector2) -> void:
 
 # ── Wave system ───────────────────────────────────────────────────────────────
 
+func _is_beacon_mission() -> bool:
+	return _mission_runtime != null and is_instance_valid(_mission_runtime) \
+		and _mission_runtime.mission != null \
+		and _mission_runtime.mission.objective_type == _MissionData.ObjectiveType.ACTIVATE_BEACONS
+
 func _start_mission() -> void:
 	_wave           += 1
 	_mission_active  = true
@@ -994,8 +1076,11 @@ func _start_mission() -> void:
 	_check_npc_spawn()
 	SoundManager.play_wave()
 	shake(4.0)
-	_hud.announce_wave(_wave, "OLEADA %d" % _wave)
-	_spawn_wave()
+	if _is_beacon_mission():
+		_hud.announce_wave(_wave, "ACTIVA AMBOS SATÉLITES")
+	else:
+		_hud.announce_wave(_wave, "OLEADA %d" % _wave)
+		_spawn_wave()
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
 		if _mission_runtime.mission != null:
 			if _mission_runtime.mission.objective_type == _MissionData.ObjectiveType.KILL_BOSS and _wave == 4:
@@ -1052,6 +1137,8 @@ func _spawn_wave() -> void:
 
 func _tick_mission(_delta: float) -> void:
 	if not _mission_active or _game_over:
+		return
+	if _is_beacon_mission():
 		return
 	if _killed > 0 and _enemies.get_child_count() == 0:
 		_on_wave_complete()
