@@ -79,10 +79,11 @@ var _assault_npc:  Node2D
 var _medic_npc:    Node2D
 var _engineer_npc: Node2D
 
-var _wave:       int  = 0
-var _kills:      int  = 0
-var _killed:     int  = 0
-var _game_over:  bool = false
+var _wave:        int  = 0
+var _kills:       int  = 0
+var _killed:      int  = 0
+var _wave_total:  int  = 0
+var _game_over:   bool = false
 
 var _mission_active:   bool = false
 var _mission_runtime:  Node = null
@@ -1009,6 +1010,10 @@ func _spawn_wave() -> void:
 	var count:    int   = (80 + _wave * 40) if is_survival else (18 + _wave * 6)
 	var interval: float = 0.055 if is_survival else 0.17
 
+	_wave_total = count
+	_killed     = 0
+	_hud.update_enemy_progress(0, count)
+
 	for i in count:
 		await get_tree().create_timer(interval * i).timeout
 		if not _mission_active or not is_instance_valid(self):
@@ -1057,6 +1062,7 @@ func _on_wave_complete() -> void:
 	_mission_active = false
 	_grenade_mode   = false
 	_hud.update_grenade(_grenade_count, false)
+	_hud.update_enemy_progress(0, 0)
 	shake(8.0)
 	var reward := 8 + _wave * 2
 	_biomasa  += reward
@@ -1188,6 +1194,7 @@ func _on_enemy_died(e: Node) -> void:
 	_kills  += 1
 	_killed += 1
 	_hud.update_kills(_kills)
+	_hud.update_enemy_progress(_killed, _wave_total)
 	_spawn_death_effect(e.global_position, e.body_color)
 	var raw    = e.get("max_hp")
 	var scrap := clampi(int(float(int(raw)) / 10.0), 1, 5) if raw != null else 1

@@ -54,6 +54,14 @@ var _elevation_level: int     = 0
 var _stair_cooldown:  float   = 0.0
 var _current_stair:   Variant = null
 
+# Dash
+const DASH_SPEED    := 620.0
+const DASH_DURATION := 0.13
+const DASH_COOLDOWN := 1.2
+var _dash_t:   float = 0.0   # tiempo restante del dash activo
+var _dash_cd:  float = 0.0   # cooldown entre dashes
+var _dash_dir: Vector2 = Vector2.ZERO
+
 
 func _ready() -> void:
 	collision_layer = 1
@@ -74,6 +82,19 @@ func _draw() -> void:
 			var a := TAU * i / 14.0
 			pts.append(Vector2(cos(a) * rx, cy + sin(a) * ry))
 		draw_colored_polygon(pts, Color(0.0, 0.0, 0.0, 0.45))
+
+	# Trail de dash
+	if _dash_t > 0.0:
+		var pct := _dash_t / DASH_DURATION
+		for k in 4:
+			var offset := -_dash_dir * (12.0 + k * 10.0)
+			draw_circle(offset, 16.0 * (1.0 - k * 0.18),
+				Color(0.28, 0.78, 0.28, pct * (0.35 - k * 0.07)))
+	# Indicador de cooldown de dash (arco debajo del jugador)
+	elif _dash_cd > 0.0:
+		var ready_pct := 1.0 - (_dash_cd / DASH_COOLDOWN)
+		draw_arc(Vector2.ZERO, 19.0, -PI * 0.5, -PI * 0.5 + TAU * ready_pct, 24,
+			Color(0.28, 0.78, 0.28, 0.5), 2.0)
 
 	# Cuerpo (se escala ligeramente al subir de nivel)
 	var sf := 1.0 + _elevation_level * 0.04
@@ -100,7 +121,14 @@ func _draw() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	_move()
+	_dash_t  = maxf(_dash_t  - delta, 0.0)
+	_dash_cd = maxf(_dash_cd - delta, 0.0)
+	if _dash_t > 0.0 or _dash_cd > 0.0:
+		queue_redraw()
+	if _dash_t > 0.0:
+		velocity = _dash_dir * DASH_SPEED
+	else:
+		_move()
 	look_at(get_global_mouse_position())
 	move_and_slide()
 	_clamp_to_elevation_platform()
@@ -153,6 +181,26 @@ func _unhandled_input(event: InputEvent) -> void:
 					_start_reload()
 			KEY_E:
 				_try_climb()
+			KEY_SPACE:
+				_try_dash()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dash
+# ─────────────────────────────────────────────────────────────────────────────
+
+func _try_dash() -> void:
+	if _dash_cd > 0.0 or _elevation_level > 0:
+		return
+	var dir := Vector2(
+		Input.get_axis("ui_left",  "ui_right"),
+		Input.get_axis("ui_up",    "ui_down")).normalized()
+	if dir == Vector2.ZERO:
+		dir = Vector2.from_angle(rotation)
+	_dash_dir = dir
+	_dash_t   = DASH_DURATION
+	_dash_cd  = DASH_COOLDOWN
+	queue_redraw()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -52,6 +52,7 @@ var _mission_bar: ColorRect
 var _queen_lbl:   Label
 
 var _elev_lbl:      Label
+var _enemy_progress: Label
 var _stair_prompt:  Label
 var _max_hp:     int   = 100
 var _infect_lbl: Label
@@ -105,6 +106,12 @@ func _build() -> void:
 	vbox.add_child(_weapon_lbl)
 	vbox.add_child(_ammo_lbl)
 	vbox.add_child(_elev_lbl)
+
+	# Contador de enemigos de la wave actual — se posiciona debajo del HUD lateral
+	_enemy_progress = _lbl("", 15)
+	_enemy_progress.add_theme_color_override("font_color", Color(1.0, 0.82, 0.25))
+	_enemy_progress.visible = false
+	vbox.add_child(_enemy_progress)
 	_bomb_lbl = _lbl("  BOMBA  —", 15)
 	_bomb_lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
 	_grenade_lbl = _lbl("  GRANADA  —", 15)
@@ -344,6 +351,23 @@ func update_max_hp(v: int) -> void:
 
 func update_wave(v: int)     -> void: _wave_lbl.text  = "MISIÓN: %d" % v
 func update_kills(v: int)    -> void: _kills_lbl.text = "KILLS: %d" % v
+
+func update_enemy_progress(killed: int, total: int) -> void:
+	if total <= 0:
+		_enemy_progress.visible = false
+		return
+	_enemy_progress.visible = true
+	var pct := float(killed) / float(total)
+	var bar_len := 12
+	var filled  := int(pct * bar_len)
+	var bar     := "█".repeat(filled) + "░".repeat(bar_len - filled)
+	_enemy_progress.text = "%d/%d  %s" % [killed, total, bar]
+	if pct >= 0.8:
+		_enemy_progress.add_theme_color_override("font_color", Color(0.35, 1.0, 0.45))
+	elif pct >= 0.5:
+		_enemy_progress.add_theme_color_override("font_color", Color(1.0, 0.82, 0.25))
+	else:
+		_enemy_progress.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 
 func update_base_hp(v: int) -> void:
 	_base_lbl.text = "BASE: %d" % v
