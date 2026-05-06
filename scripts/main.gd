@@ -924,9 +924,9 @@ func _start_mission() -> void:
 				_spawn_boss()
 
 func _spawn_wave() -> void:
-	var hp_mult  := 1.0 + (_wave - 1) * 0.18
-	var base_spd := 80.0 + (_wave - 1) * 14.0
-	var count    := 8 + _wave * 2
+	var hp_mult  := 1.0 + (_wave - 1) * 0.22
+	var base_spd := 85.0 + (_wave - 1) * 16.0
+	var count    := 14 + _wave * 4
 	for i in count:
 		await get_tree().create_timer(0.25 * i).timeout
 		if not _mission_active or not is_instance_valid(self):
