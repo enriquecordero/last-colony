@@ -99,6 +99,7 @@ var _grenade_count: int  = 3
 var _grenade_mode:  bool = false
 var _sats_activated:   int = 0
 var _caches_collected: int = 0
+var _burrows_closed:   int = 0
 
 var _biomasa:          int       = 0
 var _build_phase:      bool      = false
@@ -549,8 +550,9 @@ func _spawn_mission_objects(mission) -> void:
 				cache.collected.connect(_on_cache_collected)
 				_mission_objects.add_child(cache)
 		_MissionData.ObjectiveType.CLOSE_BURROWS:
+			_burrows_closed = 0
 			for _i in mission.objective_count:
-				var pos := _pick_mission_obj_pos(placed)
+				var pos := _pick_cache_pos(placed)
 				placed.append(pos)
 				var burrow := Burrow.new()
 				burrow.position         = pos
@@ -558,9 +560,11 @@ func _spawn_mission_objects(mission) -> void:
 				burrow.base_pos         = BASE_POS
 				burrow.bullet_container = _bullets
 				burrow.wave_num         = _wave
+				burrow.escalation       = 0
 				burrow.closed.connect(_on_burrow_closed)
 				burrow.enemy_spawned.connect(_on_burrow_enemy_spawned)
 				_mission_objects.add_child(burrow)
+			_spawn_map_fill(40)
 
 func _pick_mission_obj_pos(existing: Array) -> Vector2:
 	for _i in 40:
@@ -688,6 +692,16 @@ func _on_boss_rugido() -> void:
 	_hud.show_npc_announcement("¡RUGIDO! TORRETAS PARALIZADAS 4s", Color(0.9, 0.35, 0.1))
 
 func _on_burrow_closed(_burrow: Node) -> void:
+	_burrows_closed += 1
+	# Escalar todas las madrigueras que quedan
+	for obj in _mission_objects.get_children():
+		if is_instance_valid(obj) and obj.get("escalation") != null:
+			obj.escalation = _burrows_closed
+	match _burrows_closed:
+		1: _hud.announce_wave(_wave, "¡MADRIGUERA CERRADA — SE ENFURECEN!")
+		2: _hud.announce_wave(_wave, "¡MADRIGUERA CERRADA — RESISTENCIA CRECIENTE!")
+		3: _hud.announce_wave(_wave, "¡ÚLTIMA MADRIGUERA — RESISTENCIA MÁXIMA!")
+	shake(6.0 * _burrows_closed)
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
 		_mission_runtime.notify_burrow_closed()
 
@@ -1138,6 +1152,11 @@ func _is_cache_mission() -> bool:
 		and _mission_runtime.mission != null \
 		and _mission_runtime.mission.objective_type == _MissionData.ObjectiveType.COLLECT_CACHES
 
+func _is_burrow_mission() -> bool:
+	return _mission_runtime != null and is_instance_valid(_mission_runtime) \
+		and _mission_runtime.mission != null \
+		and _mission_runtime.mission.objective_type == _MissionData.ObjectiveType.CLOSE_BURROWS
+
 func _start_mission() -> void:
 	_wave           += 1
 	_mission_active  = true
@@ -1150,6 +1169,8 @@ func _start_mission() -> void:
 		_hud.announce_wave(_wave, "ACTIVA AMBOS SATÉLITES")
 	elif _is_cache_mission():
 		_hud.announce_wave(_wave, "RECOGE LAS CACHÉS DE INVESTIGACIÓN")
+	elif _is_burrow_mission():
+		_hud.announce_wave(_wave, "CIERRA LAS MADRIGUERAS — SE VUELVEN MÁS FUERTES")
 	else:
 		_hud.announce_wave(_wave, "OLEADA %d" % _wave)
 		_spawn_wave()
@@ -1210,7 +1231,7 @@ func _spawn_wave() -> void:
 func _tick_mission(_delta: float) -> void:
 	if not _mission_active or _game_over:
 		return
-	if _is_beacon_mission() or _is_cache_mission():
+	if _is_beacon_mission() or _is_cache_mission() or _is_burrow_mission():
 		return
 	if _killed > 0 and _enemies.get_child_count() == 0:
 		_on_wave_complete()
