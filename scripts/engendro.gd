@@ -58,7 +58,7 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 
-func _tick_walk(delta: float) -> void:
+func _tick_walk(_delta: float) -> void:
 	if not is_instance_valid(player):
 		return
 	velocity = (player.global_position - global_position).normalized() * SPEED
