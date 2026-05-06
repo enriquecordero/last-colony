@@ -12,12 +12,13 @@ func _ready() -> void:
 	body_color   = Color(0.62, 0.12, 0.78)
 	body_radius  = 11.0
 	speed        = 62.0
+	_sprite_tex   = "res://assets/sprites/escupidor.png"
+	_sprite_scale = 0.58
 	super._ready()
 	_shoot_cd = randf_range(0.8, 2.5)
 
 func _draw() -> void:
 	super._draw()
-	draw_circle(Vector2.ZERO, 4.0, Color(1.0, 0.55, 1.0, 0.75))
 
 func _physics_process(delta: float) -> void:
 	_update_target()

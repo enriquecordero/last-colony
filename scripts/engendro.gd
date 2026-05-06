@@ -37,6 +37,7 @@ var _charging:   bool  = false
 var _charge_dir: Vector2 = Vector2.ZERO
 var _charge_rem: float  = 0.0
 var _phase2:     bool  = false
+var _sprite:     Sprite2D = null
 
 
 func _ready() -> void:
@@ -47,6 +48,10 @@ func _ready() -> void:
 	var col          = CollisionShape2D.new()
 	col.shape        = shape
 	add_child(col)
+	_sprite         = Sprite2D.new()
+	_sprite.texture = load("res://assets/sprites/boss.png")
+	_sprite.scale   = Vector2(0.68, 0.68)
+	add_child(_sprite)
 
 
 func _physics_process(delta: float) -> void:
@@ -57,6 +62,8 @@ func _physics_process(delta: float) -> void:
 		_tick_walk(delta)
 	_tick_attacks(delta)
 	_melee_cd -= delta
+	if _sprite and velocity.length() > 5.0:
+		_sprite.rotation = velocity.angle()
 	queue_redraw()
 
 
@@ -164,37 +171,23 @@ func _enter_phase2() -> void:
 
 
 func _draw() -> void:
-	var pulse_spd := 5.5 if _phase2 else 2.4
-	var pulse := 0.82 + sin(_t * pulse_spd) * 0.18
-
-	# Shadow
-	draw_circle(Vector2(5, 9), 26, Color(0, 0, 0, 0.4))
-
 	# Charge trail
 	if _charging:
-		var back := -_charge_dir * 28.0
-		draw_line(Vector2.ZERO, back, Color(1.0, 0.45, 0.0, 0.5), 14.0)
+		var back := -_charge_dir * 32.0
+		draw_line(Vector2.ZERO, back, Color(1.0, 0.45, 0.0, 0.55), 16.0)
 
-	# Body
-	draw_circle(Vector2.ZERO, 22, body_color.darkened(0.35))
-	draw_circle(Vector2.ZERO, 18, body_color)
-	draw_arc(Vector2.ZERO, 18, 0, TAU, 28, body_color.lightened(0.25) * pulse, 2.5)
-	draw_arc(Vector2.ZERO, 23, 0, TAU, 28, Color(0.9, 0.15, 0.1, 0.3 * pulse), 1.5)
-
-	# Three eyes in triangle
-	for i in 3:
-		var a  := -PI * 0.5 + TAU * i / 3.0
-		var ep := Vector2(cos(a), sin(a)) * 9.0
-		var ep2 := ep * 0.35
-		draw_circle(ep, 5.0, Color(0.9, 0.08, 0.0, 0.7 + 0.3 * pulse))
-		draw_circle(ep2, 2.2, Color(1.0, 0.85, 0.0))
+	# Phase 2 aura
+	if _phase2:
+		var pulse_spd := 5.5
+		var pulse := 0.5 + sin(_t * pulse_spd) * 0.5
+		draw_arc(Vector2.ZERO, 28, 0, TAU, 32, Color(1.0, 0.15, 0.0, 0.35 * pulse), 4.0)
 
 	# HP bar
-	var bw := 46.0
-	draw_rect(Rect2(-bw * 0.5, -33, bw, 5), Color(0.08, 0.0, 0.0, 0.9))
-	draw_rect(Rect2(-bw * 0.5, -33, bw * float(hp) / float(max_hp), 5),
+	var bw := 52.0
+	draw_rect(Rect2(-bw * 0.5, -40, bw, 5), Color(0.08, 0.0, 0.0, 0.9))
+	draw_rect(Rect2(-bw * 0.5, -40, bw * float(hp) / float(max_hp), 5),
 		Color(0.88, 0.12, 0.08))
 
 	var f := ThemeDB.fallback_font
-	draw_string(f, Vector2(-30, -39), "EL ENGENDRO",
+	draw_string(f, Vector2(-30, -46), "EL ENGENDRO",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(1.0, 0.35, 0.15, 0.9))

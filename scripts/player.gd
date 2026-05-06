@@ -59,14 +59,19 @@ var _current_stair:   Variant = null
 const DASH_SPEED    := 620.0
 const DASH_DURATION := 0.13
 const DASH_COOLDOWN := 1.2
-var _dash_t:   float = 0.0   # tiempo restante del dash activo
-var _dash_cd:  float = 0.0   # cooldown entre dashes
+var _dash_t:   float = 0.0
+var _dash_cd:  float = 0.0
 var _dash_dir: Vector2 = Vector2.ZERO
+var _sprite:   Sprite2D = null
 
 
 func _ready() -> void:
 	collision_layer = 1
 	collision_mask  = 10
+	_sprite         = Sprite2D.new()
+	_sprite.texture = load("res://assets/sprites/player.png")
+	_sprite.scale   = Vector2(0.68, 0.68)
+	add_child(_sprite)
 	queue_redraw()
 	call_deferred("_emit_ammo")
 
@@ -97,19 +102,10 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, 19.0, -PI * 0.5, -PI * 0.5 + TAU * ready_pct, 24,
 			Color(0.28, 0.78, 0.28, 0.5), 2.0)
 
-	# Cuerpo (se escala ligeramente al subir de nivel)
-	var sf := 1.0 + _elevation_level * 0.04
-	var r  := 16.0 * sf
-	draw_circle(Vector2.ZERO, r, Color(0.13, 0.52, 0.13))
-	draw_arc(Vector2.ZERO, r, 0, TAU, 32, Color(0.28, 0.78, 0.28), 2.5)
-	draw_circle(Vector2(4, 0), 9 * sf, Color(0.08, 0.40, 0.08))
-	draw_rect(Rect2(Vector2(1, -4), Vector2(11, 8) * sf), Color(0.1, 0.72, 1.0, 0.88))
-	draw_rect(Rect2(Vector2(14, -2.5), Vector2(14, 5)), Color(0.58, 0.58, 0.62))
-	draw_rect(Rect2(Vector2(14, -2.5), Vector2(14, 5)), Color(0.75, 0.75, 0.8), false, 1.0)
-
 	# Indicador de nivel
 	if _elevation_level > 0:
 		var f := ThemeDB.fallback_font
+		var r := 16.0 + _elevation_level * 0.64
 		draw_string(f, Vector2(-9, -r - 6), "L%d" % _elevation_level,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.4, 1.0, 0.5))
 
@@ -133,6 +129,8 @@ func _physics_process(delta: float) -> void:
 	look_at(get_global_mouse_position())
 	move_and_slide()
 	_clamp_to_elevation_platform()
+	if _sprite:
+		_sprite.rotation = (get_global_mouse_position() - global_position).angle() - rotation
 
 	_fire_cd -= delta
 	_stair_cooldown = maxf(_stair_cooldown - delta, 0.0)
