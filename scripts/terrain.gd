@@ -147,7 +147,7 @@ func _draw() -> void:
 			var a  := pts[i]
 			var b  := pts[(i + 1) % n]
 			var mid := (a + b) * 0.5
-			var to_ctr := (r["center"] - mid).normalized()
+			var to_ctr: Vector2 = (r["center"] - mid).normalized()
 			# Faces pointing away from center & upward get the highlight
 			var face_n := (b - a).normalized().rotated(-PI * 0.5)
 			if face_n.dot(to_ctr) < -0.3 and face_n.y < 0.2:

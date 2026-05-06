@@ -627,9 +627,9 @@ func _spawn_cache_ambush(cache_num: int) -> void:
 	const COUNTS := [0, 18, 38, 65]
 	const HP_M   := [0.0, 1.3, 1.8, 2.8]
 	const SPD_M  := [0.0, 1.1, 1.3, 1.6]
-	var count := COUNTS[mini(cache_num, 3)]
-	var hp_m  := HP_M[mini(cache_num, 3)]
-	var spd_m := SPD_M[mini(cache_num, 3)]
+	var count: int   = COUNTS[mini(cache_num, 3)]
+	var hp_m:  float = HP_M[mini(cache_num, 3)]
+	var spd_m: float = SPD_M[mini(cache_num, 3)]
 	match cache_num:
 		1: _hud.announce_wave(_wave, "¡SEÑAL DETECTADA — HOSTILES EN CAMINO!")
 		2: _hud.announce_wave(_wave, "¡MÚLTIPLES HOSTILES — PREPÁRENSE!")

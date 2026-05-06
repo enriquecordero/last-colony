@@ -42,7 +42,7 @@ func _draw() -> void:
 
 	# Flying sparks
 	for p in _particles:
-		var age := minf(_t / p["life"], 1.0)
+		var age: float = minf(_t / float(p["life"]), 1.0)
 		var a   := lerpf(0.95, 0.0, age)
 		if a <= 0.0:
 			continue
