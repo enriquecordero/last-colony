@@ -56,13 +56,19 @@ func _act(delta: float) -> void:
 			if _shoot_cd <= 0.0:
 				_shoot()
 		else:
-			# Idle: follow player
-			if is_instance_valid(player):
-				var to_p := player.global_position - global_position
-				if to_p.length() > FOLLOW_DIST:
-					velocity = to_p.normalized() * SPEED * 0.6
-				else:
-					velocity = Vector2.ZERO
+			# Idle: volver al centro del hex para poder alcanzar a cualquiera rápido
+			var idle_target: Vector2
+			if base_pos != Vector2.ZERO:
+				idle_target = base_pos
+			elif is_instance_valid(player):
+				idle_target = player.global_position
+			else:
+				velocity = Vector2.ZERO
+				queue_redraw()
+				return
+			var to_idle := idle_target - global_position
+			if to_idle.length() > 80.0:
+				velocity = to_idle.normalized() * SPEED * 0.55
 			else:
 				velocity = Vector2.ZERO
 	queue_redraw()

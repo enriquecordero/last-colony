@@ -8,10 +8,11 @@ extends "res://scripts/npc_soldier.gd"
 
 const BULLET_SCENE = preload("res://scenes/bullet.tscn")
 
-const RANGE       := 280.0
+const RANGE       := 420.0   # cubre toda la puerta asignada
 const SPEED       := 130.0
 const FIRE_RATE   := 0.4
 const FOLLOW_DIST := 90.0
+const POST_DIST   := 55.0    # se queda quieto si está a menos de esto de su puesto
 
 var bullet_container: Node2D
 var enemies_node:     Node2D
@@ -39,13 +40,18 @@ func _act(delta: float) -> void:
 		if _fire_cd <= 0.0:
 			_shoot()
 	else:
-		# Sin amenaza: seguir al player
-		if is_instance_valid(player):
-			var to_p: Vector2 = player.global_position - global_position
-			if to_p.length() > FOLLOW_DIST:
-				velocity = to_p.normalized() * SPEED * 0.7
-			else:
-				velocity = Vector2.ZERO
+		# Sin amenaza: volver al puesto asignado (o seguir al player si no hay puesto)
+		var idle_target: Vector2
+		if post_pos != Vector2.ZERO:
+			idle_target = post_pos
+		elif is_instance_valid(player):
+			idle_target = player.global_position
+		else:
+			velocity = Vector2.ZERO
+			return
+		var to_idle: Vector2 = idle_target - global_position
+		if to_idle.length() > POST_DIST:
+			velocity = to_idle.normalized() * SPEED * 0.65
 		else:
 			velocity = Vector2.ZERO
 	queue_redraw()

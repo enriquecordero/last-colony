@@ -1001,9 +1001,7 @@ func _start_mission() -> void:
 				_spawn_boss()
 
 func _spawn_wave() -> void:
-	var is_survival: bool = _mission_runtime != null and is_instance_valid(_mission_runtime) \
-		and _mission_runtime.mission != null \
-		and _mission_runtime.mission.type == _MissionData.MissionType.SURVIVAL
+	var is_survival: bool = _is_survival()
 
 	# SURVIVAL: overwhelm — necesitas torres, minas y NPCs para sobrevivir
 	var hp_mult:  float = 1.0 + (_wave - 1) * (0.45 if is_survival else 0.28)
@@ -1074,10 +1072,7 @@ func _on_wave_complete() -> void:
 # ── NPC squad ─────────────────────────────────────────────────────────────────
 
 func _check_npc_spawn() -> void:
-	var survival: bool = _mission_runtime != null and is_instance_valid(_mission_runtime) \
-		and _mission_runtime.mission != null \
-		and _mission_runtime.mission.type == _MissionData.MissionType.SURVIVAL
-	if survival:
+	if _is_survival():
 		# En fortress defense, todos spawnean en wave 1 en las puertas de los brazos
 		if _wave == 1:
 			if not is_instance_valid(_assault_npc): _spawn_assault_npc()
@@ -1092,11 +1087,7 @@ func _check_npc_spawn() -> void:
 			_spawn_engineer_npc()
 
 func _npc_spawn_pos(offset_normal: Vector2) -> Vector2:
-	# En SURVIVAL, posicionar NPCs en la mitad del brazo correspondiente
-	var survival: bool = _mission_runtime != null and is_instance_valid(_mission_runtime) \
-		and _mission_runtime.mission != null \
-		and _mission_runtime.mission.type == _MissionData.MissionType.SURVIVAL
-	if survival:
+	if _is_survival():
 		const ARM_MID := 280.0  # aprox mitad del brazo (HEX_RADIUS*0.866 + ARM_LEN/2)
 		return BASE_POS + offset_normal * ARM_MID
 	return BASE_POS + offset_normal * 70.0
@@ -1108,6 +1099,8 @@ func _spawn_assault_npc() -> void:
 	_assault_npc.base_pos         = BASE_POS
 	_assault_npc.bullet_container = _bullets
 	_assault_npc.enemies_node     = _enemies
+	if _is_survival():
+		_assault_npc.post_pos = _npc_spawn_pos(Vector2(1, 0))
 	_assault_npc.died.connect(_on_npc_died)
 	_friendlies.add_child(_assault_npc)
 	_hud.show_npc_announcement("ASALTO", Color(0.45, 0.75, 1.0))
@@ -1131,9 +1124,16 @@ func _spawn_engineer_npc() -> void:
 	_engineer_npc.bullet_container = _bullets
 	_engineer_npc.enemies_node     = _enemies
 	_engineer_npc.walls_node       = _walls
+	if _is_survival():
+		_engineer_npc.post_pos = _npc_spawn_pos(Vector2(0, -1))
 	_engineer_npc.died.connect(_on_npc_died)
 	_friendlies.add_child(_engineer_npc)
 	_hud.show_npc_announcement("INGENIERO", Color(1.0, 0.65, 0.20))
+
+func _is_survival() -> bool:
+	return _mission_runtime != null and is_instance_valid(_mission_runtime) \
+		and _mission_runtime.mission != null \
+		and _mission_runtime.mission.type == _MissionData.MissionType.SURVIVAL
 
 func _on_npc_died(npc: Node) -> void:
 	if npc == _assault_npc:

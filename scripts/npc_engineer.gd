@@ -54,11 +54,12 @@ func _act(delta: float) -> void:
 	queue_redraw()
 
 func _build_phase_logic() -> void:
-	# Roam around base perimeter and build structures
+	# Construye defensas cerca de su puesto asignado (o base si no hay puesto)
 	if _build_target == Vector2.ZERO \
 			or global_position.distance_to(_build_target) < 35.0:
+		var build_center := post_pos if post_pos != Vector2.ZERO else base_pos
 		var angle := randf() * TAU
-		_build_target = base_pos + Vector2(cos(angle), sin(angle)) * BUILD_RADIUS
+		_build_target = build_center + Vector2(cos(angle), sin(angle)) * BUILD_RADIUS
 
 	var to_t := _build_target - global_position
 	if to_t.length() > 30.0:
@@ -128,14 +129,19 @@ func _combat_logic() -> void:
 			_apply_flame()
 		return
 
-	# 3) Idle near player
+	# 3) Idle: volver al puesto asignado (o seguir al player si no hay puesto)
 	_flame_active = false
-	if is_instance_valid(player):
-		var to_p := player.global_position - global_position
-		if to_p.length() > FOLLOW_DIST:
-			velocity = to_p.normalized() * SPEED * 0.55
-		else:
-			velocity = Vector2.ZERO
+	var idle_target: Vector2
+	if post_pos != Vector2.ZERO:
+		idle_target = post_pos
+	elif is_instance_valid(player):
+		idle_target = player.global_position
+	else:
+		velocity = Vector2.ZERO
+		return
+	var to_idle := idle_target - global_position
+	if to_idle.length() > FOLLOW_DIST * 0.5:
+		velocity = to_idle.normalized() * SPEED * 0.55
 	else:
 		velocity = Vector2.ZERO
 

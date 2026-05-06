@@ -35,6 +35,7 @@ var down: bool   = false
 var down_t: float = 0.0
 var player: Node2D
 var base_pos: Vector2 = Vector2.ZERO
+var post_pos: Vector2 = Vector2.ZERO   # posición de guardia asignada; Vector2.ZERO = sin puesto fijo
 
 var _sprite_tex: String  = ""
 var _sprite:     Sprite2D
