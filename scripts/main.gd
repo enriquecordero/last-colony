@@ -108,6 +108,9 @@ var _upg_fire:          int  = 0
 var _upg_armor:         int  = 0
 var _healed_this_phase: bool = false
 
+var _pause_layer: CanvasLayer = null
+var _paused:      bool        = false
+
 func _ready() -> void:
 	_build_scene()
 	if StageManager.selected_mission_id.is_empty():
@@ -199,6 +202,75 @@ func _build_scene() -> void:
 	_camera.limit_bottom = int(MAP_H)
 	add_child(_camera)
 	_camera.make_current()
+
+	_build_pause_menu()
+
+func _build_pause_menu() -> void:
+	_pause_layer        = CanvasLayer.new()
+	_pause_layer.layer  = 50
+	_pause_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(_pause_layer)
+
+	var dim := ColorRect.new()
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0, 0, 0, 0.6)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_pause_layer.add_child(dim)
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.custom_minimum_size = Vector2(280, 180)
+	panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	_pause_layer.add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 16)
+	panel.add_child(vbox)
+
+	var title_lbl := Label.new()
+	title_lbl.text = "PAUSADO"
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.add_theme_font_size_override("font_size", 22)
+	title_lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 1.0))
+	vbox.add_child(title_lbl)
+
+	var resume_btn := Button.new()
+	resume_btn.text = "REANUDAR"
+	resume_btn.custom_minimum_size = Vector2(220, 44)
+	resume_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	resume_btn.pressed.connect(_unpause)
+	vbox.add_child(resume_btn)
+
+	var exit_btn := Button.new()
+	exit_btn.text = "SALIR AL MENÚ"
+	exit_btn.custom_minimum_size = Vector2(220, 44)
+	exit_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	exit_btn.pressed.connect(_exit_to_menu)
+	vbox.add_child(exit_btn)
+
+	_pause_layer.visible = false
+
+func _toggle_pause() -> void:
+	if _paused:
+		_unpause()
+	else:
+		_pause()
+
+func _pause() -> void:
+	_paused = true
+	get_tree().paused = true
+	_pause_layer.visible = true
+
+func _unpause() -> void:
+	_paused = false
+	get_tree().paused = false
+	_pause_layer.visible = false
+
+func _exit_to_menu() -> void:
+	_paused = false
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://scenes/stage_select.tscn")
 
 # ── Title screen ──────────────────────────────────────────────────────────────
 
@@ -292,7 +364,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_M:
 				if _build_phase: _set_build_type(BuildType.MINE)
 			KEY_ESCAPE:
-				if _build_mode: _set_build_mode(false)
+				if _build_mode:
+					_set_build_mode(false)
+				else:
+					_toggle_pause()
 			KEY_F:
 				_try_revive_nearby()
 				_try_interact_mission_object()
