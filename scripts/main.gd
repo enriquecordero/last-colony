@@ -19,6 +19,8 @@ const MinePreview     = preload("res://scripts/mine_preview.gd")
 const Crate           = preload("res://scripts/crate.gd")
 const BombEffect      = preload("res://scripts/bomb_effect.gd")
 const Grenade         = preload("res://scripts/grenade.gd")
+const _MissionData    = preload("res://scripts/mission_data.gd")
+const _MissionRuntime = preload("res://scripts/mission_runtime.gd")
 
 const NPCAssault  = preload("res://scripts/npc_assault.gd")
 const NPCMedic    = preload("res://scripts/npc_medic.gd")
@@ -77,7 +79,9 @@ var _kills:      int  = 0
 var _killed:     int  = 0
 var _game_over:  bool = false
 
-var _mission_active: bool = false
+var _mission_active:   bool = false
+var _mission_runtime:  Node = null
+var _mission_finished: bool = false
 
 var _base_hp:     int   = 1000
 var _base_dmg_cd: float = 0.0
@@ -100,7 +104,10 @@ var _healed_this_phase: bool = false
 
 func _ready() -> void:
 	_build_scene()
-	_show_title()
+	if StageManager.selected_mission_id.is_empty():
+		_show_title()
+	else:
+		_start_game()
 
 func _build_scene() -> void:
 	var bg := ColorRect.new()
@@ -310,7 +317,92 @@ func _dismiss_title() -> void:
 func _start_game() -> void:
 	_player.set_physics_process(true)
 	_player.set_process_unhandled_input(true)
+	_setup_mission_runtime()
 	_start_build_phase()
+
+func _setup_mission_runtime() -> void:
+	var mid := StageManager.selected_mission_id
+	if mid.is_empty():
+		return
+	var mission = StageRegistry.get_mission(mid)
+	if mission == null:
+		return
+
+	if mission.type == _MissionData.MissionType.INCURSION:
+		_fortress.position = Vector2(-9999.0, -9999.0)
+
+	if StageManager.is_reward_unlocked("antiserum") and is_instance_valid(_player):
+		_player.serum = true
+
+	_spawn_pre_populate(mission.pre_populate_enemies)
+
+	_mission_runtime = _MissionRuntime.new()
+	_mission_runtime.mission = mission
+	add_child(_mission_runtime)
+	_mission_runtime.completed.connect(_on_mission_completed)
+	_mission_runtime.failed.connect(_on_mission_failed)
+	_mission_runtime.start()
+
+func _spawn_pre_populate(count: int) -> void:
+	if count <= 0:
+		return
+	for _i in count:
+		var e = LARVA_SCENE.instantiate()
+		e.speed            = 55.0
+		e.max_hp           = 20
+		e.hp               = 20
+		e.player           = _player
+		e.base_pos         = BASE_POS
+		e.bullet_container = _bullets
+		if "fortress" in e:
+			e.fortress = _fortress
+		e.died.connect(_on_enemy_died)
+		e.position = _pick_far_spawn_pos()
+		_enemies.add_child(e)
+
+func _pick_far_spawn_pos() -> Vector2:
+	for _i in 30:
+		var pos := Vector2(
+			randf_range(200.0, MAP_W - 200.0),
+			randf_range(200.0, MAP_H - 200.0))
+		if pos.distance_to(BASE_POS) > 500.0:
+			return pos
+	return _pick_spawn_pos()
+
+func _on_mission_completed(chatarra: int, reward_id: String) -> void:
+	_mission_active   = false
+	_mission_finished = true
+	_biomasa         += chatarra
+	_hud.update_biomasa(_biomasa)
+	StageManager.set_last_result({
+		"success":   true,
+		"chatarra":  chatarra,
+		"reward_id": reward_id,
+		"waves":     _wave,
+		"kills":     _kills,
+	})
+	shake(12.0)
+	_hud.announce_wave(_wave, "MISIÓN COMPLETADA")
+	await get_tree().create_timer(2.5).timeout
+	if is_instance_valid(self):
+		get_tree().change_scene_to_file("res://scenes/mission_result.tscn")
+
+func _on_mission_failed(reason: String) -> void:
+	_game_over      = true
+	_mission_active = false
+	StageManager.set_last_result({
+		"success": false,
+		"reason":  reason,
+		"waves":   _wave,
+		"kills":   _kills,
+	})
+	_player.set_physics_process(false)
+	_player.set_process_unhandled_input(false)
+	_hud.hide_upgrades()
+	_hud.hide_build_phase()
+	await get_tree().create_timer(2.5).timeout
+	if is_instance_valid(self):
+		get_tree().change_scene_to_file("res://scenes/mission_result.tscn")
 
 # ── Physics ───────────────────────────────────────────────────────────────────
 
@@ -744,8 +836,10 @@ func _on_wave_complete() -> void:
 	_hud.update_biomasa(_biomasa)
 	_spawn_scrap_text(BASE_POS + Vector2(0, -80), reward)
 	_hud.announce_wave(_wave, "OLEADA COMPLETADA  +%d CHATARRA" % reward)
+	if _mission_runtime != null and is_instance_valid(_mission_runtime):
+		_mission_runtime.notify_wave_completed()
 	await get_tree().create_timer(2.0).timeout
-	if is_instance_valid(self) and not _game_over:
+	if is_instance_valid(self) and not _game_over and not _mission_finished:
 		_start_build_phase()
 
 # ── NPC squad ─────────────────────────────────────────────────────────────────
@@ -909,9 +1003,16 @@ func _on_player_died() -> void:
 		if is_instance_valid(c): c.queue_free()
 	for e in _enemies.get_children():
 		e.queue_free()
-	_hud.show_game_over(_wave, _kills)
 	_player.set_physics_process(false)
 	_player.set_process_unhandled_input(false)
+	if _mission_runtime != null and is_instance_valid(_mission_runtime):
+		var mtype = _mission_runtime.mission.type if _mission_runtime.mission != null else -1
+		if mtype == _MissionData.MissionType.SURVIVAL:
+			_mission_runtime.notify_failed_survival()
+		else:
+			_mission_runtime.notify_failed("player_died")
+	else:
+		_hud.show_game_over(_wave, _kills)
 
 func _on_base_destroyed() -> void:
 	_game_over      = true
@@ -925,9 +1026,16 @@ func _on_base_destroyed() -> void:
 		if is_instance_valid(c): c.queue_free()
 	for e in _enemies.get_children():
 		e.queue_free()
-	_hud.show_game_over(_wave, _kills, true)
 	_player.set_physics_process(false)
 	_player.set_process_unhandled_input(false)
+	if _mission_runtime != null and is_instance_valid(_mission_runtime):
+		var mtype = _mission_runtime.mission.type if _mission_runtime.mission != null else -1
+		if mtype == _MissionData.MissionType.SURVIVAL:
+			_mission_runtime.notify_failed_survival()
+		else:
+			_mission_runtime.notify_failed("base_destroyed")
+	else:
+		_hud.show_game_over(_wave, _kills, true)
 
 func _on_hp_changed(v: int) -> void:
 	_hud.update_hp(v)

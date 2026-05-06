@@ -36,10 +36,14 @@ func notify_burrow_closed() -> void:
 func notify_boss_killed() -> void:
 	_notify_objective()
 
+func notify_failed(reason: String) -> void:
+	failed.emit(reason)
+	queue_free()
+
 func notify_failed_survival() -> void:
 	if mission != null:
 		StageManager.lose_stage_progress(mission.stage_id)
-	failed.emit("survival_failed")
+	notify_failed("survival_failed")
 
 func _notify_objective() -> void:
 	if mission == null:

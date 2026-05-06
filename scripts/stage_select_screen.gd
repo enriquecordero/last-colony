@@ -2,17 +2,17 @@ extends Control
 
 const MissionData = preload("res://scripts/mission_data.gd")
 
-const VIEW_W  := 1280.0
+const VIEW_W := 1280.0
 const VIEW_H  := 720.0
 const CARD_W  := 240.0
 const CARD_H  := 112.0
 
 const _POSITIONS: Dictionary = {
-	"stage1_recon":         Vector2(640, 148),
-	"stage1_satellite":     Vector2(370, 305),
-	"stage1_research":      Vector2(910, 305),
-	"stage1_extermination": Vector2(640, 458),
-	"stage1_engendro":      Vector2(640, 600),
+	"stage1_recon":         Vector2(640, 145),
+	"stage1_satellite":     Vector2(370, 292),
+	"stage1_research":      Vector2(910, 292),
+	"stage1_extermination": Vector2(640, 440),
+	"stage1_engendro":      Vector2(640, 575),
 }
 
 const _CONNECTIONS: Array = [
@@ -29,6 +29,14 @@ const COL_LOCKED    := Color(0.35, 0.35, 0.40)
 const COL_SURVIVAL  := Color(0.95, 0.40, 0.20)
 const COL_LINE      := Color(0.28, 0.42, 0.28, 0.65)
 
+var _selected_id:     String     = ""
+var _survival_confirm: bool      = false
+var _card_panels:     Dictionary = {}
+var _deploy_panel:    Panel      = null
+var _deploy_name_lbl: Label      = null
+var _deploy_warn_lbl: Label      = null
+var _deploy_btn:      Button     = null
+
 func _ready() -> void:
 	_build()
 
@@ -40,13 +48,13 @@ func _build() -> void:
 
 	var title := _lbl("◈  SECTOR ALPHA  ◈", 32, Color(0.3, 1.0, 0.42))
 	title.size                 = Vector2(VIEW_W, 42)
-	title.position             = Vector2(0, 28)
+	title.position             = Vector2(0, 20)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
 
 	var sub := _lbl("Seleccioná una misión", 14, Color(0.45, 0.65, 0.45))
 	sub.size                 = Vector2(VIEW_W, 22)
-	sub.position             = Vector2(0, 72)
+	sub.position             = Vector2(0, 62)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(sub)
 
@@ -54,9 +62,10 @@ func _build() -> void:
 	for m in missions:
 		_build_card(m)
 
+	_build_deploy_panel()
 	queue_redraw()
 
-func _build_card(mission: MissionData) -> void:
+func _build_card(mission) -> void:
 	var status := StageManager.get_mission_status(mission.id)
 	var center: Vector2 = _POSITIONS[mission.id]
 	var col    := _status_color(status, mission.type)
@@ -66,6 +75,7 @@ func _build_card(mission: MissionData) -> void:
 	card.position     = center - Vector2(CARD_W * 0.5, CARD_H * 0.5)
 	card.mouse_filter = MOUSE_FILTER_STOP
 	add_child(card)
+	_card_panels[mission.id] = card
 
 	var tint       := ColorRect.new()
 	tint.size       = Vector2(CARD_W, CARD_H)
@@ -106,13 +116,94 @@ func _build_card(mission: MissionData) -> void:
 		opt.position = Vector2(CARD_W - 78, 10)
 		card.add_child(opt)
 
+	if status != "locked":
+		var mid: String = mission.id
+		card.gui_input.connect(func(event: InputEvent) -> void:
+			if event is InputEventMouseButton and event.pressed \
+					and event.button_index == MOUSE_BUTTON_LEFT:
+				_select_mission(mid))
+
+func _build_deploy_panel() -> void:
+	_deploy_panel          = Panel.new()
+	_deploy_panel.size     = Vector2(700, 78)
+	_deploy_panel.position = Vector2((VIEW_W - 700) * 0.5, VIEW_H - 90)
+	_deploy_panel.visible  = false
+	add_child(_deploy_panel)
+
+	_deploy_name_lbl = _lbl("", 18, Color(0.85, 0.95, 0.85))
+	_deploy_name_lbl.size     = Vector2(500, 26)
+	_deploy_name_lbl.position = Vector2(14, 8)
+	_deploy_panel.add_child(_deploy_name_lbl)
+
+	_deploy_warn_lbl = _lbl("", 12, COL_SURVIVAL)
+	_deploy_warn_lbl.size     = Vector2(500, 20)
+	_deploy_warn_lbl.position = Vector2(14, 38)
+	_deploy_warn_lbl.visible  = false
+	_deploy_panel.add_child(_deploy_warn_lbl)
+
+	_deploy_btn          = Button.new()
+	_deploy_btn.text     = "DESPLEGAR"
+	_deploy_btn.add_theme_font_size_override("font_size", 17)
+	_deploy_btn.size     = Vector2(160, 46)
+	_deploy_btn.position = Vector2(526, 16)
+	_deploy_btn.pressed.connect(_on_deploy_pressed)
+	_deploy_panel.add_child(_deploy_btn)
+
+func _select_mission(id: String) -> void:
+	_selected_id       = id
+	_survival_confirm  = false
+	_update_highlights()
+	_update_deploy_panel()
+
+func _update_highlights() -> void:
+	for mid in _card_panels:
+		_card_panels[mid].modulate = Color(1.3, 1.3, 0.9) if mid == _selected_id \
+				else Color(1.0, 1.0, 1.0)
+
+func _update_deploy_panel() -> void:
+	if _selected_id.is_empty():
+		_deploy_panel.visible = false
+		return
+	var mission = StageRegistry.get_mission(_selected_id)
+	if mission == null:
+		_deploy_panel.visible = false
+		return
+
+	_deploy_name_lbl.text = mission.display_name.to_upper()
+	_deploy_btn.text      = "DESPLEGAR"
+	_deploy_btn.modulate  = Color.WHITE
+
+	var is_survival: bool = (mission.type == MissionData.MissionType.SURVIVAL)
+	_deploy_warn_lbl.visible = is_survival as bool
+	if is_survival:
+		_deploy_warn_lbl.text = "[!] SURVIVAL — si fallás perdés el progreso del Stage 1"
+
+	_deploy_panel.visible = true
+
+func _on_deploy_pressed() -> void:
+	if _selected_id.is_empty():
+		return
+	var mission = StageRegistry.get_mission(_selected_id)
+	if mission == null:
+		return
+	if mission.type == MissionData.MissionType.SURVIVAL and not _survival_confirm:
+		_survival_confirm    = true
+		_deploy_btn.text     = "¿CONFIRMAR?"
+		_deploy_btn.modulate = Color(1.5, 0.6, 0.4)
+		return
+	_do_deploy()
+
+func _do_deploy() -> void:
+	StageManager.selected_mission_id = _selected_id
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
 func _draw() -> void:
 	for pair in _CONNECTIONS:
 		var a: Vector2 = _POSITIONS[pair[0]]
 		var b: Vector2 = _POSITIONS[pair[1]]
 		draw_line(a + Vector2(0, CARD_H * 0.5), b - Vector2(0, CARD_H * 0.5), COL_LINE, 2.0, true)
 
-func _status_color(status: String, type: MissionData.MissionType) -> Color:
+func _status_color(status: String, type: int) -> Color:
 	if type == MissionData.MissionType.SURVIVAL and status != "locked":
 		return COL_SURVIVAL
 	match status:
@@ -120,7 +211,7 @@ func _status_color(status: String, type: MissionData.MissionType) -> Color:
 		"completed": return COL_COMPLETED
 		_:           return COL_LOCKED
 
-func _type_str(type: MissionData.MissionType) -> String:
+func _type_str(type: int) -> String:
 	match type:
 		MissionData.MissionType.INCURSION: return "INCURSION"
 		MissionData.MissionType.SURVIVAL:  return "[!] SURVIVAL"
