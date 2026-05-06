@@ -693,14 +693,14 @@ func get_door_centers() -> Dictionary:
 func get_level_bounds(level: int, pos: Vector2) -> Rect2:
 	match level:
 		1:
-			var best := platform_polygons[0]
-			var best_d := pos.distance_to(best.get_center())
-			for r in platform_polygons:
-				var d := pos.distance_to(r.get_center())
+			var best: Rect2 = platform_polygons[0]
+			var best_d: float = pos.distance_to(best.get_center())
+			for r: Rect2 in platform_polygons:
+				var d: float = pos.distance_to(r.get_center())
 				if d < best_d:
 					best_d = d
 					best   = r
-			var sw_d := pos.distance_to(south_wall_rect.get_center())
+			var sw_d: float = pos.distance_to(south_wall_rect.get_center())
 			if sw_d < best_d:
 				return south_wall_rect
 			return best
