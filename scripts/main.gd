@@ -1195,7 +1195,14 @@ func _on_enemy_died(e: Node) -> void:
 	_killed += 1
 	_hud.update_kills(_kills)
 	_hud.update_enemy_progress(_killed, _wave_total)
-	_spawn_death_effect(e.global_position, e.body_color)
+	var mhp: int = int(e.get("max_hp") if e.get("max_hp") != null else 10)
+	var ef_scale := 1.0
+	var shk      := 1.2
+	if   mhp >= 400: ef_scale = 3.0; shk = 5.0
+	elif mhp >= 120: ef_scale = 2.0; shk = 2.8
+	elif mhp >= 40:  ef_scale = 1.4; shk = 1.8
+	shake(shk)
+	_spawn_death_effect(e.global_position, e.body_color, ef_scale)
 	var raw    = e.get("max_hp")
 	var scrap := clampi(int(float(int(raw)) / 10.0), 1, 5) if raw != null else 1
 	_biomasa  += scrap
@@ -1222,10 +1229,11 @@ func _on_enemy_died(e: Node) -> void:
 	SoundManager.play("death")
 	shake(1.5)
 
-func _spawn_death_effect(pos: Vector2, color: Color) -> void:
-	var ef      = DeathEffect.new()
-	ef.position = pos
-	ef._color   = color
+func _spawn_death_effect(pos: Vector2, color: Color, scale_f: float = 1.0) -> void:
+	var ef         = DeathEffect.new()
+	ef.position    = pos
+	ef._color      = color
+	ef._scale_f    = scale_f
 	add_child(ef)
 
 func _spawn_scrap_text(pos: Vector2, amount: int) -> void:

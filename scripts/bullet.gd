@@ -1,6 +1,7 @@
 extends Area2D
 
 const BASE_SPEED = 650.0
+const HitSpark   = preload("res://scripts/hit_spark.gd")
 
 var direction: Vector2 = Vector2.RIGHT
 var lifetime:  float   = 2.5
@@ -26,4 +27,8 @@ func _physics_process(delta: float) -> void:
 func _on_body_entered(body: Node) -> void:
 	if body.has_method("take_damage"):
 		body.take_damage(damage)
+		var spark        := HitSpark.new()
+		spark.global_position = global_position
+		spark._color     = bcolor
+		get_parent().add_child(spark)
 	queue_free()
