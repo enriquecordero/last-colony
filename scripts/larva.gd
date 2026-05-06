@@ -20,8 +20,8 @@ var _wall_dmg_cd:     float   = 0.0
 var _is_aerial:       bool    = false
 var _current_target:  Vector2 = Vector2.ZERO
 
-var _sprite_tex:   String  = "res://assets/sprites/larva.png"
-var _sprite_scale: float   = 0.60
+var _sprite_tex:   String   = ""
+var _sprite_scale: float    = 0.60
 var _sprite:       Sprite2D = null
 
 func _ready() -> void:
@@ -39,7 +39,9 @@ func _ready() -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	# HP bar only — body is drawn by Sprite2D
+	if _sprite == null:
+		draw_circle(Vector2.ZERO, body_radius, body_color)
+		draw_arc(Vector2.ZERO, body_radius, 0, TAU, 24, body_color.lightened(0.4), 2.0)
 	if hp >= 0 and hp < max_hp:
 		var bw := body_radius * 2.4
 		var bh := 3.5
@@ -66,8 +68,6 @@ func _physics_process(delta: float) -> void:
 	_update_target()
 	velocity = (_current_target - global_position).normalized() * speed
 	move_and_slide()
-	if _sprite and velocity.length() > 5.0:
-		_sprite.rotation = velocity.angle()
 	_dmg_cd      -= delta
 	_wall_dmg_cd -= delta
 
