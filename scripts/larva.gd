@@ -41,6 +41,10 @@ func _draw() -> void:
 		draw_rect(Rect2(bx, by, bw * float(hp) / float(max_hp), bh), Color(1.0, 0.15, 0.1))
 
 func _update_target() -> void:
+	if is_instance_valid(player) and \
+			global_position.distance_to(player.global_position) < 320.0:
+		_current_target = player.global_position
+		return
 	if not is_instance_valid(fortress):
 		_current_target = base_pos
 		return

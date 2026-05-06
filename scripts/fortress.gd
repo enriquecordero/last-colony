@@ -99,7 +99,7 @@ var _pulse_t: float = 0.0
 
 
 func _ready() -> void:
-	z_index = -1
+	z_index = 0
 	_build_geometry()
 	set_process(true)
 
