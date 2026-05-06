@@ -32,6 +32,7 @@ var hp:               int    = 100
 var bullet_container: Node2D
 var fortress:         Node2D
 var building:         bool   = false
+var taller_active:    bool   = false
 var infected:         bool   = false
 var serum:            bool   = false
 var _infect_tick:     float  = 0.0
@@ -267,7 +268,8 @@ func get_range_mult() -> float:
 	return ELEV_RANGE_MULT[clamp(_elevation_level, 0, 3)]
 
 func get_damage_mult() -> float:
-	return ELEV_DMG_MULT[clamp(_elevation_level, 0, 3)]
+	var base := ELEV_DMG_MULT[clamp(_elevation_level, 0, 3)]
+	return base * (1.35 if taller_active else 1.0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

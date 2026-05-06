@@ -14,6 +14,7 @@ var max_hp:           int     = 150
 var bullet_container: Node2D
 var enemies_node:     Node2D
 var elevation_level:  int     = 0
+var fire_rate_mult:   float   = 1.0   # < 1.0 = faster; set by TALLER station
 var _fire_cd:         float   = 0.0
 var _aim_dir:         Vector2 = Vector2.RIGHT
 
@@ -74,7 +75,7 @@ func _shoot() -> void:
 		b.lifetime = float(b.lifetime) * ELEV_RANGE_MULT[lvl]
 	bullet_container.call_deferred("add_child", b)
 	SoundManager.play("shoot")
-	_fire_cd = BASE_FIRE_RATE
+	_fire_cd = BASE_FIRE_RATE * fire_rate_mult
 
 
 func take_damage(amount: int) -> void:

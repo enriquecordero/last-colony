@@ -3,6 +3,7 @@ extends CharacterBody2D
 signal died(node)
 signal summoned_larva(enemy)
 signal rugido_emitted()
+signal phase2_entered()
 
 const LarvaScene = preload("res://scenes/larva.tscn")
 
@@ -35,6 +36,7 @@ var _rugido:     float = RUGIDO_CD
 var _charging:   bool  = false
 var _charge_dir: Vector2 = Vector2.ZERO
 var _charge_rem: float  = 0.0
+var _phase2:     bool  = false
 
 
 func _ready() -> void:
@@ -61,7 +63,8 @@ func _physics_process(delta: float) -> void:
 func _tick_walk(_delta: float) -> void:
 	if not is_instance_valid(player):
 		return
-	velocity = (player.global_position - global_position).normalized() * SPEED
+	var spd := 110.0 if _phase2 else SPEED
+	velocity = (player.global_position - global_position).normalized() * spd
 	move_and_slide()
 	if _melee_cd <= 0.0 and global_position.distance_to(player.global_position) < MELEE_RANGE:
 		player.take_damage(MELEE_DMG)
@@ -97,15 +100,15 @@ func _tick_attacks(delta: float) -> void:
 
 	if _embestida <= 0.0:
 		_start_embestida()
-		_embestida = EMBESTIDA_CD
+		_embestida = 4.5 if _phase2 else EMBESTIDA_CD
 
 	if _llamado <= 0.0:
 		_do_llamado()
-		_llamado = LLAMADO_CD
+		_llamado = 6.0 if _phase2 else LLAMADO_CD
 
 	if _rugido <= 0.0:
 		_do_rugido()
-		_rugido = RUGIDO_CD
+		_rugido = 13.0 if _phase2 else RUGIDO_CD
 
 
 func _start_embestida() -> void:
@@ -117,9 +120,10 @@ func _start_embestida() -> void:
 
 
 func _do_llamado() -> void:
-	for i in 6:
+	var count := 10 if _phase2 else 6
+	for i in count:
 		var e = LarvaScene.instantiate()
-		var a := TAU * i / 6.0
+		var a := TAU * i / float(count)
 		e.position         = global_position + Vector2(cos(a), sin(a)) * 70.0
 		e.player           = player
 		e.base_pos         = base_pos
@@ -139,13 +143,29 @@ func take_damage(amount: int) -> void:
 	var tw := create_tween()
 	tw.tween_property(self, "modulate", Color.WHITE, 0.12)
 	queue_redraw()
+	if not _phase2 and hp <= max_hp / 2:
+		_enter_phase2()
 	if hp <= 0:
 		died.emit(self)
 		queue_free()
 
+func _enter_phase2() -> void:
+	_phase2      = true
+	# Velocidad y cadencias más agresivas
+	const P2_SPEED      := 110.0
+	const P2_EMBESTIDA  := 4.5
+	const P2_LLAMADO    := 6.0
+	const P2_RUGIDO     := 14.0
+	_embestida = P2_EMBESTIDA * 0.3   # primera embestida casi inmediata
+	_llamado   = P2_LLAMADO   * 0.2
+	_rugido    = P2_RUGIDO    * 0.5
+	body_color = Color(0.95, 0.05, 0.02)
+	phase2_entered.emit()
+
 
 func _draw() -> void:
-	var pulse := 0.82 + sin(_t * 2.4) * 0.18
+	var pulse_spd := 5.5 if _phase2 else 2.4
+	var pulse := 0.82 + sin(_t * pulse_spd) * 0.18
 
 	# Shadow
 	draw_circle(Vector2(5, 9), 26, Color(0, 0, 0, 0.4))

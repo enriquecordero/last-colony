@@ -691,6 +691,10 @@ func get_slot_by_type(stype: int) -> Slot:
 			return slot
 	return null
 
+func has_station(stype: int) -> bool:
+	var slot := get_slot_by_type(stype)
+	return slot != null and slot.built
+
 # ¿La posición está sobre algún slot vacío? (para colocar estación)
 func get_slot_at(pos: Vector2) -> Slot:
 	for slot in slots:

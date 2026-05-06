@@ -114,6 +114,7 @@ var _healed_this_phase: bool = false
 
 var _pause_layer: CanvasLayer = null
 var _paused:      bool        = false
+var _regen_t:     float       = 0.0
 
 func _ready() -> void:
 	_build_scene()
@@ -670,6 +671,7 @@ func _spawn_boss() -> void:
 	_boss.died.connect(_on_boss_died)
 	_boss.summoned_larva.connect(_on_boss_summoned_larva)
 	_boss.rugido_emitted.connect(_on_boss_rugido)
+	_boss.phase2_entered.connect(_on_boss_phase2)
 	_enemies.add_child(_boss)
 	_hud.show_npc_announcement("¡EL ENGENDRO HA LLEGADO!", Color(1.0, 0.25, 0.1))
 
@@ -690,6 +692,10 @@ func _on_boss_rugido() -> void:
 		if is_instance_valid(s) and s.get("_fire_cd") != null:
 			s.set("_fire_cd", 4.0)
 	_hud.show_npc_announcement("¡RUGIDO! TORRETAS PARALIZADAS 4s", Color(0.9, 0.35, 0.1))
+
+func _on_boss_phase2() -> void:
+	shake(18.0)
+	_hud.show_npc_announcement("¡EL ENGENDRO ENTRA EN FRENESÍ — FASE 2!", Color(1.0, 0.15, 0.05))
 
 func _on_burrow_closed(_burrow: Node) -> void:
 	_burrows_closed += 1
@@ -776,6 +782,7 @@ func _physics_process(delta: float) -> void:
 	_tick_build_phase(delta)
 	_tick_build_preview()
 	_tick_mission(delta)
+	_tick_regen(delta)
 
 func _tick_camera() -> void:
 	if _game_over:
@@ -833,6 +840,43 @@ func _tick_build_preview() -> void:
 func shake(strength: float) -> void:
 	_shake = maxf(_shake, strength)
 
+# ── Station effects ───────────────────────────────────────────────────────────
+
+func _apply_station_buffs() -> void:
+	if not is_instance_valid(_fortress):
+		return
+	var has_taller    := _fortress.has_station(Fortress.StationType.TALLER)
+	var has_generator := _fortress.has_station(Fortress.StationType.GENERATOR)
+	var has_enfermeria := _fortress.has_station(Fortress.StationType.ENFERMERIA)
+
+	if is_instance_valid(_player):
+		_player.taller_active = has_taller
+
+	var turret_mult := 0.6 if has_taller else 1.0
+	for s in _walls.get_children():
+		if is_instance_valid(s) and s.get("fire_rate_mult") != null:
+			s.fire_rate_mult = turret_mult
+
+	var msgs: Array = []
+	if has_taller:     msgs.append("TALLER: DAÑO +35%  TORRETAS ×1.7")
+	if has_generator:  msgs.append("GENERADOR: +15 BIOMASA/OLEADA  +1 GRANADA")
+	if has_enfermeria: msgs.append("ENFERMERÍA: REGENERACIÓN ACTIVA")
+	for m in msgs:
+		_hud.show_npc_announcement(m, Color(0.85, 0.65, 0.20))
+
+func _tick_regen(delta: float) -> void:
+	if not _mission_active or _game_over:
+		return
+	if not is_instance_valid(_fortress) or not _fortress.has_station(Fortress.StationType.ENFERMERIA):
+		return
+	if not is_instance_valid(_player) or _player.hp >= _player.max_hp:
+		return
+	_regen_t += delta
+	if _regen_t >= 3.0:
+		_regen_t = 0.0
+		_player.hp = mini(_player.hp + 2, _player.max_hp)
+		_hud.update_hp(_player.hp)
+
 func _on_player_elevation_changed(level: int) -> void:
 	if _hud.has_method("update_elevation"):
 		_hud.update_elevation(level)
@@ -852,7 +896,8 @@ func _start_build_phase() -> void:
 	_build_phase        = true
 	_build_phase_time   = BUILD_PHASE_TIME
 	_healed_this_phase  = false
-	_grenade_count      = mini(_grenade_count + 2, 6)
+	var grenade_bonus := 1 if (is_instance_valid(_fortress) and _fortress.has_station(Fortress.StationType.GENERATOR)) else 0
+	_grenade_count      = mini(_grenade_count + 2 + grenade_bonus, 6)
 	_grenade_mode       = false
 	_hud.show_build_phase(int(BUILD_PHASE_TIME))
 	_hud.show_upgrades(_upg_speed, _upg_fire, _upg_armor, _healed_this_phase, _biomasa)
@@ -877,6 +922,7 @@ func _end_build_phase() -> void:
 		if is_instance_valid(c): c.queue_free()
 	if is_instance_valid(_engineer_npc):
 		_engineer_npc.build_phase_active = false
+	_apply_station_buffs()
 	_start_mission()
 
 func _set_build_type(type: BuildType) -> void:
@@ -1245,6 +1291,8 @@ func _on_wave_complete() -> void:
 	_hud.update_enemy_progress(0, 0)
 	shake(8.0)
 	var reward := 8 + _wave * 2
+	var gen_bonus := 15 if (is_instance_valid(_fortress) and _fortress.has_station(Fortress.StationType.GENERATOR)) else 0
+	reward    += gen_bonus
 	_biomasa  += reward
 	_hud.update_biomasa(_biomasa)
 	_spawn_scrap_text(BASE_POS + Vector2(0, -80), reward)
