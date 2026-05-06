@@ -1,5 +1,3 @@
-class_name MissionData
-
 enum MissionType   { DEFEND, INCURSION, SURVIVAL }
 enum ObjectiveType { SURVIVE_WAVES, ACTIVATE_BEACONS, COLLECT_CACHES, CLOSE_BURROWS, KILL_BOSS }
 

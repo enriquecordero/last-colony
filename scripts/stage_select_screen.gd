@@ -1,5 +1,7 @@
 extends Control
 
+const MissionData = preload("res://scripts/mission_data.gd")
+
 const VIEW_W  := 1280.0
 const VIEW_H  := 720.0
 const CARD_W  := 240.0
@@ -138,9 +140,9 @@ func _reward_str(reward_id: String) -> String:
 		"stage1_complete": return "Desbloquea Stage 2"
 		_:                 return reward_id
 
-func _lbl(text: String, size: int, color: Color) -> Label:
+func _lbl(text: String, sz: int, color: Color) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", sz)
 	l.add_theme_color_override("font_color", color)
 	return l

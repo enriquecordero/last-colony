@@ -14,7 +14,7 @@ func _ready() -> void:
 func get_mission_status(mission_id: String) -> String:
 	if is_mission_completed(mission_id):
 		return "completed"
-	var mission: MissionData = StageRegistry.get_mission(mission_id)
+	var mission = StageRegistry.get_mission(mission_id)
 	if mission == null:
 		return "locked"
 	for req in mission.required_missions:
@@ -43,7 +43,7 @@ func is_reward_unlocked(reward_id: String) -> bool:
 	return reward_id in unlocked_rewards
 
 func lose_stage_progress(stage_id: String) -> void:
-	var stage: StageData = StageRegistry.get_stage(stage_id)
+	var stage = StageRegistry.get_stage(stage_id)
 	if stage == null:
 		return
 	for mission in stage.missions:

@@ -1,6 +1,8 @@
 class_name MissionRuntime
 extends Node
 
+const MissionData = preload("res://scripts/mission_data.gd")
+
 signal completed(reward_chatarra: int, reward_id: String)
 signal failed(reason: String)
 signal progress_updated(current: int, total: int)
