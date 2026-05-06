@@ -686,3 +686,27 @@ func get_core_pos() -> Vector2:
 # Lista de centros de puerta para que el HUD muestre indicadores
 func get_door_centers() -> Dictionary:
 	return door_centers
+
+# Returns the Rect2 the player must stay within at the given elevation.
+# Level 0 returns an empty Rect2 (no constraint).
+# Level 1 returns the nearest level-1 area (corner platform or south wall).
+func get_level_bounds(level: int, pos: Vector2) -> Rect2:
+	match level:
+		1:
+			var best := platform_polygons[0]
+			var best_d := pos.distance_to(best.get_center())
+			for r in platform_polygons:
+				var d := pos.distance_to(r.get_center())
+				if d < best_d:
+					best_d = d
+					best   = r
+			var sw_d := pos.distance_to(south_wall_rect.get_center())
+			if sw_d < best_d:
+				return south_wall_rect
+			return best
+		2:
+			return tower_l2_rect
+		3:
+			return tower_l3_rect
+		_:
+			return Rect2()

@@ -103,6 +103,7 @@ func _physics_process(delta: float) -> void:
 	_move()
 	look_at(get_global_mouse_position())
 	move_and_slide()
+	_clamp_to_elevation_platform()
 
 	_fire_cd -= delta
 	_stair_cooldown = maxf(_stair_cooldown - delta, 0.0)
@@ -157,6 +158,18 @@ func _unhandled_input(event: InputEvent) -> void:
 # ─────────────────────────────────────────────────────────────────────────────
 # Elevación
 # ─────────────────────────────────────────────────────────────────────────────
+
+func _clamp_to_elevation_platform() -> void:
+	if _elevation_level == 0 or not is_instance_valid(fortress):
+		return
+	var bounds := fortress.get_level_bounds(_elevation_level, global_position)
+	if bounds.size == Vector2.ZERO:
+		return
+	const MARGIN := 8.0
+	global_position.x = clamp(global_position.x,
+		bounds.position.x + MARGIN, bounds.end.x - MARGIN)
+	global_position.y = clamp(global_position.y,
+		bounds.position.y + MARGIN, bounds.end.y - MARGIN)
 
 func _check_stair_zone() -> void:
 	if not is_instance_valid(fortress):
