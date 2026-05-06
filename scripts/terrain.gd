@@ -154,10 +154,11 @@ func _draw() -> void:
 				draw_line(a, b, r["hi"], 2.0)
 
 		# Crack details
+		var rock_center: Vector2 = r["center"]
 		for i in n:
 			if i % 3 == 1:
 				var a  := pts[i]
-				var b  := r["center"].lerp(a, 0.45)
+				var b  := rock_center.lerp(a, 0.45)
 				draw_line(a, b, r["crack"], 1.0)
 
 		# Outline
