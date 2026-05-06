@@ -933,7 +933,7 @@ func _spawn_wave() -> void:
 	# SURVIVAL: overwhelm — necesitas torres, minas y NPCs para sobrevivir
 	var hp_mult:  float = 1.0 + (_wave - 1) * (0.45 if is_survival else 0.28)
 	var base_spd: float = (105.0 + (_wave - 1) * 22.0) if is_survival else (90.0 + (_wave - 1) * 18.0)
-	var count:    int   = (40 + _wave * 20) if is_survival else (18 + _wave * 6)
+	var count:    int   = (80 + _wave * 40) if is_survival else (18 + _wave * 6)
 	var interval: float = 0.055 if is_survival else 0.17
 
 	for i in count:
