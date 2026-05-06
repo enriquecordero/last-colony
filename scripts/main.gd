@@ -927,7 +927,7 @@ func _spawn_wave() -> void:
 	var hp_mult  := 1.0 + (_wave - 1) * 0.22
 	var base_spd := 85.0 + (_wave - 1) * 16.0
 	var count    := 14 + _wave * 4
-	var is_survival := _mission_runtime != null and is_instance_valid(_mission_runtime) \
+	var is_survival: bool = _mission_runtime != null and is_instance_valid(_mission_runtime) \
 		and _mission_runtime.mission != null \
 		and _mission_runtime.mission.type == _MissionData.MissionType.SURVIVAL
 	if is_survival:
