@@ -23,6 +23,7 @@ var _current_target:  Vector2 = Vector2.ZERO
 var _sprite_tex:   String   = ""
 var _sprite_scale: float    = 0.60
 var _sprite:       Sprite2D = null
+var _draw_dir:     Vector2  = Vector2.RIGHT
 
 func _ready() -> void:
 	if hp < 0:
@@ -40,8 +41,7 @@ func _ready() -> void:
 
 func _draw() -> void:
 	if _sprite == null:
-		draw_circle(Vector2.ZERO, body_radius, body_color)
-		draw_arc(Vector2.ZERO, body_radius, 0, TAU, 24, body_color.lightened(0.4), 2.0)
+		_draw_body()
 	if hp >= 0 and hp < max_hp:
 		var bw := body_radius * 2.4
 		var bh := 3.5
@@ -49,6 +49,41 @@ func _draw() -> void:
 		var by := -(body_radius + 7.0)
 		draw_rect(Rect2(bx, by, bw, bh), Color(0.1, 0.0, 0.0, 0.85))
 		draw_rect(Rect2(bx, by, bw * float(hp) / float(max_hp), bh), Color(1.0, 0.15, 0.1))
+
+func _draw_body() -> void:
+	var d := _draw_dir
+	var r := body_radius
+	var c := body_color
+	var p := Vector2(-d.y, d.x)
+
+	draw_circle(d * 1.5 + Vector2(0, 2.5), r * 1.0, Color(0, 0, 0, 0.25))
+
+	draw_circle(-d * r * 0.50, r * 0.76, c.darkened(0.22))
+	draw_circle(Vector2.ZERO,   r * 0.86, c)
+	draw_circle(d  * r * 0.72, r * 0.60, c.lightened(0.10))
+
+	draw_line(-d * r * 0.18 - p * r * 0.62, -d * r * 0.18 + p * r * 0.62, c.darkened(0.50), 1.5)
+	draw_line( d * r * 0.22 - p * r * 0.50,  d * r * 0.22 + p * r * 0.50, c.darkened(0.50), 1.5)
+
+	for i in 3:
+		var base := d * r * ((i - 1.0) * 0.42)
+		for s in [-1.0, 1.0]:
+			var knee := base + p * s * r * 0.55
+			var tip  := knee + p * s * r * 0.45 - d * r * 0.20
+			draw_line(base, knee, c.darkened(0.10), 1.8)
+			draw_line(knee, tip,  c.darkened(0.30), 1.4)
+
+	for s in [-1.0, 1.0]:
+		var ep := d * r * 0.72 + p * s * r * 0.27
+		draw_circle(ep, 2.5, Color(1.0, 0.90, 0.05))
+		draw_circle(ep, 1.1, Color(0.05, 0.0,  0.0))
+
+	for s in [-1.0, 1.0]:
+		draw_line(d * r * 0.95 + p * s * r * 0.18,
+		          d * r * 1.28 + p * s * r * 0.40,
+		          c.lightened(0.30), 2.2)
+
+	draw_arc(Vector2.ZERO, r, 0, TAU, 24, c.lightened(0.35), 1.2)
 
 func _update_target() -> void:
 	if is_instance_valid(player) and \
@@ -68,6 +103,8 @@ func _physics_process(delta: float) -> void:
 	_update_target()
 	velocity = (_current_target - global_position).normalized() * speed
 	move_and_slide()
+	if velocity.length_squared() > 1.0:
+		_draw_dir = velocity.normalized()
 	_dmg_cd      -= delta
 	_wall_dmg_cd -= delta
 

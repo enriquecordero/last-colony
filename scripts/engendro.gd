@@ -36,8 +36,9 @@ var _rugido:     float = RUGIDO_CD
 var _charging:   bool  = false
 var _charge_dir: Vector2 = Vector2.ZERO
 var _charge_rem: float  = 0.0
-var _phase2:     bool  = false
+var _phase2:     bool    = false
 var _sprite:     Sprite2D = null
+var _draw_dir:   Vector2  = Vector2.RIGHT
 
 
 func _ready() -> void:
@@ -67,6 +68,8 @@ func _tick_walk(_delta: float) -> void:
 	var spd := 110.0 if _phase2 else SPEED
 	velocity = (player.global_position - global_position).normalized() * spd
 	move_and_slide()
+	if velocity.length_squared() > 1.0:
+		_draw_dir = velocity.normalized()
 	if _melee_cd <= 0.0 and global_position.distance_to(player.global_position) < MELEE_RANGE:
 		player.take_damage(MELEE_DMG)
 		_melee_cd = MELEE_CD_TIME
@@ -166,28 +169,69 @@ func _enter_phase2() -> void:
 
 func _draw() -> void:
 	var pulse_spd := 5.5 if _phase2 else 2.4
-	var pulse := 0.82 + sin(_t * pulse_spd) * 0.18
+	var pulse     := 0.82 + sin(_t * pulse_spd) * 0.18
+	var d         := _draw_dir
+	var p         := Vector2(-d.y, d.x)
+	var lc        := body_color.darkened(0.30)
 
-	draw_circle(Vector2(5, 9), 26, Color(0, 0, 0, 0.4))
+	# Shadow
+	draw_circle(Vector2(5, 9), 26, Color(0, 0, 0, 0.40))
 
+	# Charge trail
 	if _charging:
-		var back := -_charge_dir * 28.0
-		draw_line(Vector2.ZERO, back, Color(1.0, 0.45, 0.0, 0.5), 14.0)
+		draw_line(Vector2.ZERO, -_charge_dir * 28.0, Color(1.0, 0.45, 0.0, 0.5), 14.0)
 
+	# 4 thick limbs (behind body, animated)
+	var limb_count := 6 if _phase2 else 4
+	for i in limb_count:
+		var wave  := sin(_t * 3.5 + i * 1.1) * 0.12
+		var base_a := atan2(d.y, d.x) + TAU * i / float(limb_count) + wave
+		var ld    := Vector2(cos(base_a), sin(base_a))
+		var lp    := Vector2(-ld.y, ld.x)
+		var root  := ld * 14.0
+		var joint := ld * 28.0 + lp * (6.0 * sin(_t * 2.2 + i))
+		var tip   := joint + ld * 18.0
+		draw_line(root,  joint, lc,                   6.5)
+		draw_line(joint, tip,   lc.lightened(0.08),   4.5)
+		draw_line(tip, tip + ld * 9.0 + lp *  5.0, lc.lightened(0.20), 3.0)
+		draw_line(tip, tip + ld * 9.0 - lp *  5.0, lc.lightened(0.20), 3.0)
+
+	# Abdomen segment
+	draw_circle(-d * 10.0, 16.0, body_color.darkened(0.30))
+	# Main body
 	draw_circle(Vector2.ZERO, 22, body_color.darkened(0.35))
 	draw_circle(Vector2.ZERO, 18, body_color)
+	# Head
+	draw_circle(d * 12.0, 12.0, body_color.lightened(0.08))
+
+	# Armor arc highlights
 	draw_arc(Vector2.ZERO, 18, 0, TAU, 28, body_color.lightened(0.25) * pulse, 2.5)
-	draw_arc(Vector2.ZERO, 23, 0, TAU, 28, Color(0.9, 0.15, 0.1, 0.3 * pulse), 1.5)
+	draw_arc(Vector2.ZERO, 23, 0, TAU, 28, Color(0.9, 0.15, 0.1, 0.3 * pulse),  1.5)
 
 	if _phase2:
 		draw_arc(Vector2.ZERO, 28, 0, TAU, 32, Color(1.0, 0.15, 0.0, 0.35 * pulse), 4.0)
 
+	# Eye cluster — 3 main + 2 small on head
 	for i in 3:
 		var a  := -PI * 0.5 + TAU * i / 3.0
 		var ep := Vector2(cos(a), sin(a)) * 9.0
-		draw_circle(ep, 5.0, Color(0.9, 0.08, 0.0, 0.7 + 0.3 * pulse))
+		draw_circle(ep,        5.0, Color(0.9, 0.08, 0.0, 0.7 + 0.3 * pulse))
 		draw_circle(ep * 0.35, 2.2, Color(1.0, 0.85, 0.0))
+	for s in [-1.0, 1.0]:
+		var he := d * 14.0 + p * s * 5.0
+		draw_circle(he, 3.5, Color(1.0, 0.20, 0.0, 0.8 + 0.2 * pulse))
+		draw_circle(he, 1.5, Color(1.0, 0.90, 0.0))
 
+	# Mandibles on head
+	for s in [-1.0, 1.0]:
+		draw_line(d * 16.0 + p * s * 4.0,
+		          d * 26.0 + p * s * 10.0,
+		          body_color.lightened(0.30), 4.0)
+		draw_line(d * 26.0 + p * s * 10.0,
+		          d * 30.0 + p * s * 5.0,
+		          body_color.lightened(0.22), 3.0)
+
+	# Health bar
 	var bw := 46.0
 	draw_rect(Rect2(-bw * 0.5, -33, bw, 5), Color(0.08, 0.0, 0.0, 0.9))
 	draw_rect(Rect2(-bw * 0.5, -33, bw * float(hp) / float(max_hp), 5), Color(0.88, 0.12, 0.08))
