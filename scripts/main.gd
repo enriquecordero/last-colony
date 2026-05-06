@@ -24,6 +24,7 @@ const _MissionRuntime = preload("res://scripts/mission_runtime.gd")
 const Satellite       = preload("res://scripts/satellite.gd")
 const ResearchCache   = preload("res://scripts/research_cache.gd")
 const Burrow          = preload("res://scripts/burrow.gd")
+const Engendro        = preload("res://scripts/engendro.gd")
 
 const NPCAssault  = preload("res://scripts/npc_assault.gd")
 const NPCMedic    = preload("res://scripts/npc_medic.gd")
@@ -86,6 +87,7 @@ var _game_over:  bool = false
 var _mission_active:   bool = false
 var _mission_runtime:  Node = null
 var _mission_finished: bool = false
+var _boss:             Node = null
 
 var _base_hp:     int   = 1000
 var _base_dmg_cd: float = 0.0
@@ -433,6 +435,39 @@ func _on_satellite_activated(_sat: Node) -> void:
 func _on_cache_collected(_cache: Node) -> void:
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
 		_mission_runtime.notify_cache_collected()
+
+func _spawn_boss() -> void:
+	_boss                  = Engendro.new()
+	_boss.position         = _pick_far_spawn_pos()
+	_boss.player           = _player
+	_boss.base_pos         = BASE_POS
+	_boss.bullet_container = _bullets
+	_boss.walls_node       = _walls
+	if "fortress" in _boss:
+		_boss.fortress = _fortress
+	_boss.died.connect(_on_boss_died)
+	_boss.summoned_larva.connect(_on_boss_summoned_larva)
+	_boss.rugido_emitted.connect(_on_boss_rugido)
+	_enemies.add_child(_boss)
+	_hud.show_npc_announcement("¡EL ENGENDRO HA LLEGADO!", Color(1.0, 0.25, 0.1))
+
+func _on_boss_died(e: Node) -> void:
+	_boss = null
+	_on_enemy_died(e)
+	if _mission_runtime != null and is_instance_valid(_mission_runtime):
+		_mission_runtime.notify_boss_killed()
+
+func _on_boss_summoned_larva(e: Node) -> void:
+	if not is_instance_valid(e):
+		return
+	e.died.connect(_on_enemy_died)
+	_enemies.add_child(e)
+
+func _on_boss_rugido() -> void:
+	for s in _walls.get_children():
+		if is_instance_valid(s) and s.get("_fire_cd") != null:
+			s.set("_fire_cd", 4.0)
+	_hud.show_npc_announcement("¡RUGIDO! TORRETAS PARALIZADAS 4s", Color(0.9, 0.35, 0.1))
 
 func _on_burrow_closed(_burrow: Node) -> void:
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
@@ -883,6 +918,10 @@ func _start_mission() -> void:
 	shake(4.0)
 	_hud.announce_wave(_wave, "OLEADA %d" % _wave)
 	_spawn_wave()
+	if _mission_runtime != null and is_instance_valid(_mission_runtime):
+		if _mission_runtime.mission != null:
+			if _mission_runtime.mission.objective_type == _MissionData.ObjectiveType.KILL_BOSS and _wave == 4:
+				_spawn_boss()
 
 func _spawn_wave() -> void:
 	var hp_mult  := 1.0 + (_wave - 1) * 0.18
