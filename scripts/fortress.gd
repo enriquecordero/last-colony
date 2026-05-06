@@ -300,6 +300,36 @@ func _build_collision() -> void:
 		sb.add_child(cs)
 		add_child(sb)
 
+	# ── Perímetro diagonal del hexágono ──────────────────────────────────────
+	# Sin estas paredes el jugador se escapa por las esquinas entre brazos.
+	# hx = radio horizontal de vértice (100), hw = semi-ancho de brazo (55)
+	var hx := HEX_RADIUS * 0.5   # 100
+	var hw := ARM_W * 0.5         # 55
+	# Top side: gaps entre vértice NW/NE y apertura del brazo N
+	_add_wall_seg(Vector2(-hx, -hy), Vector2(-hw, -hy))  # NW → N-arm izq
+	_add_wall_seg(Vector2( hw, -hy), Vector2( hx, -hy))  # N-arm der → NE
+	# Diagonales NE y SE (lado derecho del hex)
+	_add_wall_seg(Vector2( hx, -hy), Vector2( HEX_RADIUS, -hw))  # NE diagonal
+	_add_wall_seg(Vector2( HEX_RADIUS,  hw), Vector2( hx,  hy))  # SE diagonal
+	# Diagonales SW y NW (lado izquierdo del hex)
+	_add_wall_seg(Vector2(-hx,  hy), Vector2(-HEX_RADIUS,  hw))  # SW diagonal
+	_add_wall_seg(Vector2(-HEX_RADIUS, -hw), Vector2(-hx, -hy))  # NW diagonal
+
+
+func _add_wall_seg(from_pt: Vector2, to_pt: Vector2) -> void:
+	var sb   := StaticBody2D.new()
+	sb.collision_layer = 8
+	sb.collision_mask  = 0
+	var cs   := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	var diff := to_pt - from_pt
+	rect.size   = Vector2(diff.length(), 10.0)
+	cs.position = (from_pt + to_pt) * 0.5
+	cs.rotation = diff.angle()
+	cs.shape    = rect
+	sb.add_child(cs)
+	add_child(sb)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dibujado
