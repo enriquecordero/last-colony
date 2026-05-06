@@ -10,6 +10,7 @@ const WALL_SCENE      = preload("res://scenes/wall.tscn")
 const TURRET_SCENE    = preload("res://scenes/turret.tscn")
 const DeathEffect     = preload("res://scripts/death_effect.gd")
 const Background      = preload("res://scripts/background.gd")
+const Terrain         = preload("res://scripts/terrain.gd")
 const Fortress        = preload("res://scripts/fortress.gd")
 const WallPreview     = preload("res://scripts/wall_preview.gd")
 const TurretPreview   = preload("res://scripts/turret_preview.gd")
@@ -126,13 +127,19 @@ func _ready() -> void:
 func _build_scene() -> void:
 	var bg := ColorRect.new()
 	bg.size  = Vector2(MAP_W, MAP_H)
-	bg.color = Color(0.06, 0.06, 0.11)
+	bg.color = Color(0.10, 0.05, 0.02)
 	add_child(bg)
 
 	var grid := Background.new()
 	grid.map_w = MAP_W
 	grid.map_h = MAP_H
 	add_child(grid)
+
+	var terrain          := Terrain.new()
+	terrain.map_w        = MAP_W
+	terrain.map_h        = MAP_H
+	terrain.base_pos     = BASE_POS
+	add_child(terrain)
 
 	_fortress          = Fortress.new()
 	_fortress.position = BASE_POS
