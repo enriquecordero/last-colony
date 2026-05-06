@@ -101,6 +101,10 @@ var _healed_this_phase: bool = false
 func _ready() -> void:
 	_build_scene()
 	_show_title()
+	# VALIDACION TEMPORAL — borrar después de confirmar
+	print("[STAGE] recon status:       ", StageManager.get_mission_status("stage1_recon"))
+	print("[STAGE] boss status:        ", StageManager.get_mission_status("stage1_engendro"))
+	print("[STAGE] extermination name: ", StageRegistry.get_mission("stage1_extermination").display_name)
 
 func _build_scene() -> void:
 	var bg := ColorRect.new()

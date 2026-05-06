@@ -69,7 +69,7 @@ func _register_stage1() -> void:
 	m3.reward_id            = "antiserum"
 
 	var m4 := MissionData.new()
-	m4.id                      = "stage1_exterminio"
+	m4.id                      = "stage1_extermination"
 	m4.stage_id                = "stage1"
 	m4.display_name            = "Exterminio"
 	m4.description             = "Cerrar 4 madrigueras enemigas."
@@ -86,7 +86,7 @@ func _register_stage1() -> void:
 	m4.reward_id               = ""
 
 	var m5 := MissionData.new()
-	m5.id                   = "stage1_boss"
+	m5.id                   = "stage1_engendro"
 	m5.stage_id             = "stage1"
 	m5.display_name         = "El Engendro"
 	m5.description          = "Eliminar al líder de la horda."
@@ -95,7 +95,7 @@ func _register_stage1() -> void:
 	m5.objective_count      = 1
 	m5.max_waves            = 6
 	m5.pre_populate_enemies = 0
-	m5.required_missions    = ["stage1_exterminio"]
+	m5.required_missions    = ["stage1_extermination"]
 	m5.is_optional          = false
 	m5.reward_chatarra      = 100
 	m5.reward_id            = "stage1_complete"
