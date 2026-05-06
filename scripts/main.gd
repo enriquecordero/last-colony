@@ -23,6 +23,7 @@ const _MissionData    = preload("res://scripts/mission_data.gd")
 const _MissionRuntime = preload("res://scripts/mission_runtime.gd")
 const Satellite       = preload("res://scripts/satellite.gd")
 const ResearchCache   = preload("res://scripts/research_cache.gd")
+const Burrow          = preload("res://scripts/burrow.gd")
 
 const NPCAssault  = preload("res://scripts/npc_assault.gd")
 const NPCMedic    = preload("res://scripts/npc_medic.gd")
@@ -395,6 +396,19 @@ func _spawn_mission_objects(mission) -> void:
 				cache.position = pos
 				cache.collected.connect(_on_cache_collected)
 				_mission_objects.add_child(cache)
+		_MissionData.ObjectiveType.CLOSE_BURROWS:
+			for _i in mission.objective_count:
+				var pos := _pick_mission_obj_pos(placed)
+				placed.append(pos)
+				var burrow := Burrow.new()
+				burrow.position         = pos
+				burrow.player           = _player
+				burrow.base_pos         = BASE_POS
+				burrow.bullet_container = _bullets
+				burrow.wave_num         = _wave
+				burrow.closed.connect(_on_burrow_closed)
+				burrow.enemy_spawned.connect(_on_burrow_enemy_spawned)
+				_mission_objects.add_child(burrow)
 
 func _pick_mission_obj_pos(existing: Array) -> Vector2:
 	for _i in 40:
@@ -420,6 +434,16 @@ func _on_cache_collected(_cache: Node) -> void:
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
 		_mission_runtime.notify_cache_collected()
 
+func _on_burrow_closed(_burrow: Node) -> void:
+	if _mission_runtime != null and is_instance_valid(_mission_runtime):
+		_mission_runtime.notify_burrow_closed()
+
+func _on_burrow_enemy_spawned(e: Node) -> void:
+	if not is_instance_valid(e):
+		return
+	e.died.connect(_on_enemy_died)
+	_enemies.add_child(e)
+
 func _try_interact_mission_object() -> void:
 	if not is_instance_valid(_player) or not _mission_active:
 		return
@@ -434,6 +458,9 @@ func _try_interact_mission_object() -> void:
 			return
 		if obj.has_method("collect"):
 			obj.collect()
+			return
+		if obj.has_method("start_closing") and not obj.is_closing():
+			obj.start_closing()
 			return
 
 func _on_mission_completed(chatarra: int, reward_id: String) -> void:
