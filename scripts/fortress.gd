@@ -20,28 +20,28 @@ class_name Fortress
 # Usamos `center_offset` = Vector2.ZERO porque dibujamos centrado.
 
 # ── Geometría (en coordenadas locales relativas al centro) ──
-const HEX_RADIUS := 140.0   # tamaño del hexágono central
-const ARM_W      := 80.0    # ancho de cada brazo
-const ARM_LEN    := 130.0   # largo del brazo (desde el borde del hex)
+const HEX_RADIUS := 200.0   # tamaño del hexágono central
+const ARM_W      := 110.0   # ancho de cada brazo
+const ARM_LEN    := 185.0   # largo del brazo (desde el borde del hex)
 
 # Plataformas de torreta (esquinas del hex)
-const PLAT_SIZE  := 60.0
+const PLAT_SIZE  := 85.0
 
 # Muralla sur
-const SOUTH_W    := 280.0
-const SOUTH_H    := 40.0
+const SOUTH_W    := 390.0
+const SOUTH_H    := 52.0
 
 # Torre central (sobre muralla sur)
-const TOWER_L2_W := 100.0
-const TOWER_L2_H := 50.0
-const TOWER_L3_W := 70.0
-const TOWER_L3_H := 38.0
+const TOWER_L2_W := 135.0
+const TOWER_L2_H := 65.0
+const TOWER_L3_W := 90.0
+const TOWER_L3_H := 50.0
 
 # Escaleras
-const STAIR_SIZE := 26.0
+const STAIR_SIZE := 34.0
 
 # Núcleo
-const CORE_R     := 22.0
+const CORE_R     := 30.0
 
 # ── Colores ──
 const COL_FLOOR_0      := Color(0.10, 0.13, 0.18)
@@ -101,6 +101,7 @@ var _pulse_t: float = 0.0
 func _ready() -> void:
 	z_index = 0
 	_build_geometry()
+	_build_collision()
 	set_process(true)
 
 
@@ -260,6 +261,44 @@ func _build_geometry() -> void:
 	enfermeria.color  = Color(0.22, 1.0, 0.30)
 	enfermeria.label  = "ENFERM."
 	slots.append(enfermeria)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Colisión física (paredes de brazos y muralla sur)
+# Layer 8 = Layer 4 — misma capa que muros/torretas; bloquea enemigos y player
+# ─────────────────────────────────────────────────────────────────────────────
+
+func _build_collision() -> void:
+	const T      := 8.0
+	const SQRT32 := 0.866025
+	var   hy     := HEX_RADIUS * SQRT32
+
+	# [center_local, size]  — todo en espacio LOCAL del nodo (0,0 = centro fortress)
+	var walls: Array = [
+		# Brazo N — paredes laterales izquierda y derecha
+		[Vector2(-ARM_W * 0.5, -(hy + ARM_LEN * 0.5)), Vector2(T, ARM_LEN)],
+		[Vector2( ARM_W * 0.5, -(hy + ARM_LEN * 0.5)), Vector2(T, ARM_LEN)],
+		# Brazo E — paredes superior e inferior
+		[Vector2(HEX_RADIUS + ARM_LEN * 0.5, -ARM_W * 0.5), Vector2(ARM_LEN, T)],
+		[Vector2(HEX_RADIUS + ARM_LEN * 0.5,  ARM_W * 0.5), Vector2(ARM_LEN, T)],
+		# Brazo W — paredes superior e inferior
+		[Vector2(-(HEX_RADIUS + ARM_LEN * 0.5), -ARM_W * 0.5), Vector2(ARM_LEN, T)],
+		[Vector2(-(HEX_RADIUS + ARM_LEN * 0.5),  ARM_W * 0.5), Vector2(ARM_LEN, T)],
+		# Muralla Sur — pared sólida (no hay puerta)
+		[Vector2(0.0, hy + SOUTH_H * 0.5), Vector2(SOUTH_W, SOUTH_H)],
+	]
+
+	for w in walls:
+		var sb    := StaticBody2D.new()
+		sb.collision_layer = 8
+		sb.collision_mask  = 0
+		var cs    := CollisionShape2D.new()
+		var rect  := RectangleShape2D.new()
+		rect.size  = w[1]
+		cs.position = w[0]
+		cs.shape    = rect
+		sb.add_child(cs)
+		add_child(sb)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
