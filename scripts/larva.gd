@@ -67,18 +67,18 @@ func _draw_body() -> void:
 
 	for i in 3:
 		var base := d * r * ((i - 1.0) * 0.42)
-		for s in [-1.0, 1.0]:
+		for s: float in [-1.0, 1.0]:
 			var knee := base + p * s * r * 0.55
 			var tip  := knee + p * s * r * 0.45 - d * r * 0.20
 			draw_line(base, knee, c.darkened(0.10), 1.8)
 			draw_line(knee, tip,  c.darkened(0.30), 1.4)
 
-	for s in [-1.0, 1.0]:
+	for s: float in [-1.0, 1.0]:
 		var ep := d * r * 0.72 + p * s * r * 0.27
 		draw_circle(ep, 2.5, Color(1.0, 0.90, 0.05))
 		draw_circle(ep, 1.1, Color(0.05, 0.0,  0.0))
 
-	for s in [-1.0, 1.0]:
+	for s: float in [-1.0, 1.0]:
 		draw_line(d * r * 0.95 + p * s * r * 0.18,
 		          d * r * 1.28 + p * s * r * 0.40,
 		          c.lightened(0.30), 2.2)

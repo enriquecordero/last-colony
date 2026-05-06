@@ -217,13 +217,13 @@ func _draw() -> void:
 		var ep := Vector2(cos(a), sin(a)) * 9.0
 		draw_circle(ep,        5.0, Color(0.9, 0.08, 0.0, 0.7 + 0.3 * pulse))
 		draw_circle(ep * 0.35, 2.2, Color(1.0, 0.85, 0.0))
-	for s in [-1.0, 1.0]:
+	for s: float in [-1.0, 1.0]:
 		var he := d * 14.0 + p * s * 5.0
 		draw_circle(he, 3.5, Color(1.0, 0.20, 0.0, 0.8 + 0.2 * pulse))
 		draw_circle(he, 1.5, Color(1.0, 0.90, 0.0))
 
 	# Mandibles on head
-	for s in [-1.0, 1.0]:
+	for s: float in [-1.0, 1.0]:
 		draw_line(d * 16.0 + p * s * 4.0,
 		          d * 26.0 + p * s * 10.0,
 		          body_color.lightened(0.30), 4.0)

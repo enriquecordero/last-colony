@@ -32,14 +32,14 @@ func _draw_body() -> void:
 	# Stubby legs (2 pairs)
 	for i in 2:
 		var base := d * r * ((i - 0.5) * 0.48)
-		for s in [-1.0, 1.0]:
+		for s: float in [-1.0, 1.0]:
 			var knee := base + p * s * r * 0.72
 			var foot := knee + p * s * r * 0.28 + d * r * 0.08
 			draw_line(base, knee, c.darkened(0.05), 4.5)
 			draw_line(knee, foot, c.darkened(0.20), 3.5)
 
 	# Two massive front claws
-	for s in [-1.0, 1.0]:
+	for s: float in [-1.0, 1.0]:
 		var root := d * r * 0.72 + p * s * r * 0.30
 		var mid  := d * r * 1.18 + p * s * r * 0.58
 		var tipA := d * r * 1.50 + p * s * r * 0.32
@@ -48,7 +48,7 @@ func _draw_body() -> void:
 		draw_line(mid,  tipA, c.lightened(0.22), 3.8)
 		draw_line(mid,  tipB, c.lightened(0.22), 3.8)
 
-	for s in [-1.0, 1.0]:
+	for s: float in [-1.0, 1.0]:
 		var ep := d * r * 0.68 + p * s * r * 0.20
 		draw_circle(ep, 3.8, Color(0.55, 0.78, 1.0, 0.85))
 		draw_circle(ep, 1.6, Color(0.0,  0.0,  0.12))
