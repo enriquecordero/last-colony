@@ -514,7 +514,7 @@ func _on_mission_completed(chatarra: int, reward_id: String) -> void:
 	_hud.announce_wave(_wave, "MISIÓN COMPLETADA")
 	var _tree1 := get_tree()
 	await _tree1.create_timer(2.5).timeout
-	if is_instance_valid(self) and _tree1 != null:
+	if is_instance_valid(self) and is_instance_valid(_tree1):
 		_tree1.change_scene_to_file("res://scenes/mission_result.tscn")
 
 func _on_mission_failed(reason: String) -> void:
@@ -532,7 +532,7 @@ func _on_mission_failed(reason: String) -> void:
 	_hud.hide_build_phase()
 	var _tree2 := get_tree()
 	await _tree2.create_timer(2.5).timeout
-	if is_instance_valid(self) and _tree2 != null:
+	if is_instance_valid(self) and is_instance_valid(_tree2):
 		_tree2.change_scene_to_file("res://scenes/mission_result.tscn")
 
 # ── Physics ───────────────────────────────────────────────────────────────────
