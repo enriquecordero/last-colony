@@ -267,7 +267,7 @@ func get_range_mult() -> float:
 	return ELEV_RANGE_MULT[clamp(_elevation_level, 0, 3)]
 
 func get_damage_mult() -> float:
-	var base := ELEV_DMG_MULT[clamp(_elevation_level, 0, 3)]
+	var base: float = ELEV_DMG_MULT[clamp(_elevation_level, 0, 3)]
 	return base * (1.35 if taller_active else 1.0)
 
 
