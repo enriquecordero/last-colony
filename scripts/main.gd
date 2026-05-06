@@ -21,6 +21,8 @@ const BombEffect      = preload("res://scripts/bomb_effect.gd")
 const Grenade         = preload("res://scripts/grenade.gd")
 const _MissionData    = preload("res://scripts/mission_data.gd")
 const _MissionRuntime = preload("res://scripts/mission_runtime.gd")
+const Satellite       = preload("res://scripts/satellite.gd")
+const ResearchCache   = preload("res://scripts/research_cache.gd")
 
 const NPCAssault  = preload("res://scripts/npc_assault.gd")
 const NPCMedic    = preload("res://scripts/npc_medic.gd")
@@ -65,7 +67,8 @@ var _fortress:        Node2D
 var _wall_preview:    Node2D
 var _turret_preview:  Node2D
 var _mine_preview:    Node2D
-var _crates:          Node2D
+var _crates:           Node2D
+var _mission_objects:  Node2D
 var _title_ol:        CanvasLayer
 var _title_bg:        ColorRect
 var _title_blink:     Tween
@@ -134,6 +137,8 @@ func _build_scene() -> void:
 	add_child(_bullets)
 	_crates = Node2D.new()
 	add_child(_crates)
+	_mission_objects = Node2D.new()
+	add_child(_mission_objects)
 
 	_player                  = PLAYER_SCENE.instantiate()
 	_player.position         = BASE_POS
@@ -287,6 +292,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if _build_mode: _set_build_mode(false)
 			KEY_F:
 				_try_revive_nearby()
+				_try_interact_mission_object()
 			KEY_Q:
 				_use_bomb()
 			KEY_G:
@@ -335,6 +341,7 @@ func _setup_mission_runtime() -> void:
 		_player.serum = true
 
 	_spawn_pre_populate(mission.pre_populate_enemies)
+	_spawn_mission_objects(mission)
 
 	_mission_runtime = _MissionRuntime.new()
 	_mission_runtime.mission = mission
@@ -368,6 +375,66 @@ func _pick_far_spawn_pos() -> Vector2:
 		if pos.distance_to(BASE_POS) > 500.0:
 			return pos
 	return _pick_spawn_pos()
+
+func _spawn_mission_objects(mission) -> void:
+	var placed: Array = []
+	match mission.objective_type:
+		_MissionData.ObjectiveType.ACTIVATE_BEACONS:
+			for _i in mission.objective_count:
+				var pos := _pick_mission_obj_pos(placed)
+				placed.append(pos)
+				var sat := Satellite.new()
+				sat.position = pos
+				sat.activated.connect(_on_satellite_activated)
+				_mission_objects.add_child(sat)
+		_MissionData.ObjectiveType.COLLECT_CACHES:
+			for _i in mission.objective_count:
+				var pos := _pick_mission_obj_pos(placed)
+				placed.append(pos)
+				var cache := ResearchCache.new()
+				cache.position = pos
+				cache.collected.connect(_on_cache_collected)
+				_mission_objects.add_child(cache)
+
+func _pick_mission_obj_pos(existing: Array) -> Vector2:
+	for _i in 40:
+		var pos := Vector2(
+			randf_range(250.0, MAP_W - 250.0),
+			randf_range(250.0, MAP_H - 250.0))
+		if pos.distance_to(BASE_POS) < 450.0:
+			continue
+		var ok := true
+		for ep in existing:
+			if pos.distance_to(ep) < 350.0:
+				ok = false
+				break
+		if ok:
+			return pos
+	return BASE_POS + Vector2(650.0, 0.0).rotated(randf() * TAU)
+
+func _on_satellite_activated(_sat: Node) -> void:
+	if _mission_runtime != null and is_instance_valid(_mission_runtime):
+		_mission_runtime.notify_satellite_activated()
+
+func _on_cache_collected(_cache: Node) -> void:
+	if _mission_runtime != null and is_instance_valid(_mission_runtime):
+		_mission_runtime.notify_cache_collected()
+
+func _try_interact_mission_object() -> void:
+	if not is_instance_valid(_player) or not _mission_active:
+		return
+	var ppos := _player.global_position
+	for obj in _mission_objects.get_children():
+		if not is_instance_valid(obj):
+			continue
+		if ppos.distance_to(obj.global_position) > 80.0:
+			continue
+		if obj.has_method("start_activating") and not obj.is_activating():
+			obj.start_activating()
+			return
+		if obj.has_method("collect"):
+			obj.collect()
+			return
 
 func _on_mission_completed(chatarra: int, reward_id: String) -> void:
 	_mission_active   = false
