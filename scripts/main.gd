@@ -512,9 +512,10 @@ func _on_mission_completed(chatarra: int, reward_id: String) -> void:
 	})
 	shake(12.0)
 	_hud.announce_wave(_wave, "MISIÓN COMPLETADA")
-	await get_tree().create_timer(2.5).timeout
-	if is_instance_valid(self):
-		get_tree().change_scene_to_file("res://scenes/mission_result.tscn")
+	var _tree1 := get_tree()
+	await _tree1.create_timer(2.5).timeout
+	if is_instance_valid(self) and _tree1 != null:
+		_tree1.change_scene_to_file("res://scenes/mission_result.tscn")
 
 func _on_mission_failed(reason: String) -> void:
 	_game_over      = true
@@ -529,9 +530,10 @@ func _on_mission_failed(reason: String) -> void:
 	_player.set_process_unhandled_input(false)
 	_hud.hide_upgrades()
 	_hud.hide_build_phase()
-	await get_tree().create_timer(2.5).timeout
-	if is_instance_valid(self):
-		get_tree().change_scene_to_file("res://scenes/mission_result.tscn")
+	var _tree2 := get_tree()
+	await _tree2.create_timer(2.5).timeout
+	if is_instance_valid(self) and _tree2 != null:
+		_tree2.change_scene_to_file("res://scenes/mission_result.tscn")
 
 # ── Physics ───────────────────────────────────────────────────────────────────
 
@@ -931,7 +933,7 @@ func _spawn_wave() -> void:
 		and _mission_runtime.mission != null \
 		and _mission_runtime.mission.type == _MissionData.MissionType.SURVIVAL
 	if is_survival:
-		count = int(count * 2.5)
+		count = int(count * 3.5)
 	for i in count:
 		await get_tree().create_timer(0.25 * i).timeout
 		if not _mission_active or not is_instance_valid(self):
@@ -983,16 +985,36 @@ func _on_wave_complete() -> void:
 # ── NPC squad ─────────────────────────────────────────────────────────────────
 
 func _check_npc_spawn() -> void:
-	if _wave == 1 and not is_instance_valid(_assault_npc):
-		_spawn_assault_npc()
-	elif _wave == 2 and not is_instance_valid(_medic_npc):
-		_spawn_medic_npc()
-	elif _wave == 3 and not is_instance_valid(_engineer_npc):
-		_spawn_engineer_npc()
+	var survival: bool = _mission_runtime != null and is_instance_valid(_mission_runtime) \
+		and _mission_runtime.mission != null \
+		and _mission_runtime.mission.type == _MissionData.MissionType.SURVIVAL
+	if survival:
+		# En fortress defense, todos spawnean en wave 1 en las puertas de los brazos
+		if _wave == 1:
+			if not is_instance_valid(_assault_npc): _spawn_assault_npc()
+			if not is_instance_valid(_medic_npc):   _spawn_medic_npc()
+			if not is_instance_valid(_engineer_npc): _spawn_engineer_npc()
+	else:
+		if _wave == 1 and not is_instance_valid(_assault_npc):
+			_spawn_assault_npc()
+		elif _wave == 2 and not is_instance_valid(_medic_npc):
+			_spawn_medic_npc()
+		elif _wave == 3 and not is_instance_valid(_engineer_npc):
+			_spawn_engineer_npc()
+
+func _npc_spawn_pos(offset_normal: Vector2) -> Vector2:
+	# En SURVIVAL, posicionar NPCs en la mitad del brazo correspondiente
+	var survival: bool = _mission_runtime != null and is_instance_valid(_mission_runtime) \
+		and _mission_runtime.mission != null \
+		and _mission_runtime.mission.type == _MissionData.MissionType.SURVIVAL
+	if survival:
+		const ARM_MID := 280.0  # aprox mitad del brazo (HEX_RADIUS*0.866 + ARM_LEN/2)
+		return BASE_POS + offset_normal * ARM_MID
+	return BASE_POS + offset_normal * 70.0
 
 func _spawn_assault_npc() -> void:
 	_assault_npc                  = NPCAssault.new()
-	_assault_npc.position         = BASE_POS + Vector2(70, 0)
+	_assault_npc.position         = _npc_spawn_pos(Vector2(1, 0))   # brazo Este
 	_assault_npc.player           = _player
 	_assault_npc.base_pos         = BASE_POS
 	_assault_npc.bullet_container = _bullets
@@ -1003,7 +1025,7 @@ func _spawn_assault_npc() -> void:
 
 func _spawn_medic_npc() -> void:
 	_medic_npc                  = NPCMedic.new()
-	_medic_npc.position         = BASE_POS + Vector2(-70, 0)
+	_medic_npc.position         = _npc_spawn_pos(Vector2(-1, 0))    # brazo Oeste
 	_medic_npc.player           = _player
 	_medic_npc.base_pos         = BASE_POS
 	_medic_npc.bullet_container = _bullets
@@ -1014,7 +1036,7 @@ func _spawn_medic_npc() -> void:
 
 func _spawn_engineer_npc() -> void:
 	_engineer_npc                  = NPCEngineer.new()
-	_engineer_npc.position         = BASE_POS + Vector2(0, -70)
+	_engineer_npc.position         = _npc_spawn_pos(Vector2(0, -1))  # brazo Norte
 	_engineer_npc.player           = _player
 	_engineer_npc.base_pos         = BASE_POS
 	_engineer_npc.bullet_container = _bullets
