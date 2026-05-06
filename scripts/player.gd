@@ -162,7 +162,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _clamp_to_elevation_platform() -> void:
 	if _elevation_level == 0 or not is_instance_valid(fortress):
 		return
-	var bounds := fortress.get_level_bounds(_elevation_level, global_position)
+	var bounds: Rect2 = fortress.get_level_bounds(_elevation_level, global_position)
 	if bounds.size == Vector2.ZERO:
 		return
 	const MARGIN := 8.0
