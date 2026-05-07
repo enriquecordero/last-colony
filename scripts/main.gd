@@ -1529,11 +1529,11 @@ func _on_enemy_died(e: Node) -> void:
 		_player.add_ammo(AMMO_DROP_RIFLE, AMMO_DROP_SHOTGUN)
 		_spawn_ammo_text(e.global_position)
 
-	if hp_v >= 120 and randf() < 0.12 and is_instance_valid(_player) and _player.has_method("add_rockets"):
-		_player.add_rockets(1)
-
 	# Loot de enemigos grandes
 	var hp_v: int = int(raw) if raw != null else 0
+
+	if hp_v >= 120 and randf() < 0.12 and is_instance_valid(_player) and _player.has_method("add_rockets"):
+		_player.add_rockets(1)
 	if hp_v >= 300:
 		_drop_crate(e.global_position, Crate.Type.MEDKIT)
 		if randf() < 0.55:

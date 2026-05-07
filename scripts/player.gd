@@ -513,7 +513,7 @@ func apply_meta_ammo(level: int) -> void:
 	const EXTRA := [0, 30, 60, 90]
 	var bonus: int = EXTRA[clamp(level, 0, 3)]
 	_rifle_reserve   = RIFLE_MAX_RESERVE   + bonus
-	_shotgun_reserve = SHOTGUN_MAX_RESERVE + bonus / 3
+	_shotgun_reserve = SHOTGUN_MAX_RESERVE + floori(float(bonus) / 3.0)
 	_emit_ammo()
 
 func apply_meta_damage(level: int) -> void:
