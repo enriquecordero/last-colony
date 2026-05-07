@@ -1398,25 +1398,14 @@ func _on_wave_complete() -> void:
 # ── NPC squad ─────────────────────────────────────────────────────────────────
 
 func _check_npc_spawn() -> void:
-	if _is_survival():
-		# En fortress defense, todos spawnean en wave 1 en las puertas de los brazos
-		if _wave == 1:
-			if not is_instance_valid(_assault_npc): _spawn_assault_npc()
-			if not is_instance_valid(_medic_npc):   _spawn_medic_npc()
-			if not is_instance_valid(_engineer_npc): _spawn_engineer_npc()
-	else:
-		if _wave == 1 and not is_instance_valid(_assault_npc):
-			_spawn_assault_npc()
-		elif _wave == 2 and not is_instance_valid(_medic_npc):
-			_spawn_medic_npc()
-		elif _wave == 3 and not is_instance_valid(_engineer_npc):
-			_spawn_engineer_npc()
+	if _wave == 1:
+		if not is_instance_valid(_assault_npc):  _spawn_assault_npc()
+		if not is_instance_valid(_medic_npc):    _spawn_medic_npc()
+		if not is_instance_valid(_engineer_npc): _spawn_engineer_npc()
 
 func _npc_spawn_pos(offset_normal: Vector2) -> Vector2:
-	if _is_survival():
-		const ARM_MID := 280.0  # aprox mitad del brazo (HEX_RADIUS*0.866 + ARM_LEN/2)
-		return BASE_POS + offset_normal * ARM_MID
-	return BASE_POS + offset_normal * 70.0
+	# APO ≈ 111 + ARM_LEN/2 = 60 → midpoint of arm corridor ≈ 170
+	return BASE_POS + offset_normal * 170.0
 
 func _spawn_assault_npc() -> void:
 	_assault_npc                  = NPCAssault.new()

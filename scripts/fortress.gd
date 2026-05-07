@@ -213,27 +213,33 @@ func _build_geometry() -> void:
 # ─────────────────────────────────────────────────────────────────────────────
 
 func _build_collision() -> void:
-	var hw := ARM_W * 0.5
+	var hw  := ARM_W * 0.5                                  # 33.0
+	var v6x := OCT_RADIUS * sin(deg_to_rad(22.5))           # ≈ 45.92 — octagon vertex x at N/S faces
 	const T := 8.0
 
 	_fort_walls = []
-	# N arm left and right walls
-	_add_fort_wall(Vector2(-hw,  -_apo - ARM_LEN * 0.5), Vector2(T, ARM_LEN))
-	_add_fort_wall(Vector2( hw,  -_apo - ARM_LEN * 0.5), Vector2(T, ARM_LEN))
-	# E arm top and bottom walls
-	_add_fort_wall(Vector2(_apo + ARM_LEN * 0.5, -hw),   Vector2(ARM_LEN, T))
-	_add_fort_wall(Vector2(_apo + ARM_LEN * 0.5,  hw),   Vector2(ARM_LEN, T))
-	# W arm top and bottom walls
-	_add_fort_wall(Vector2(-_apo - ARM_LEN * 0.5, -hw),  Vector2(ARM_LEN, T))
-	_add_fort_wall(Vector2(-_apo - ARM_LEN * 0.5,  hw),  Vector2(ARM_LEN, T))
-	# South wall (solid face)
-	_add_fort_wall(Vector2(0.0, _apo + SOUTH_H * 0.5),   Vector2(SOUTH_W, SOUTH_H))
+	# Damageable arm side-walls
+	_add_fort_wall(Vector2(-hw,  -_apo - ARM_LEN * 0.5), Vector2(T, ARM_LEN))  # N left
+	_add_fort_wall(Vector2( hw,  -_apo - ARM_LEN * 0.5), Vector2(T, ARM_LEN))  # N right
+	_add_fort_wall(Vector2(_apo  + ARM_LEN * 0.5, -hw),  Vector2(ARM_LEN, T))  # E top
+	_add_fort_wall(Vector2(_apo  + ARM_LEN * 0.5,  hw),  Vector2(ARM_LEN, T))  # E bottom
+	_add_fort_wall(Vector2(-_apo - ARM_LEN * 0.5, -hw),  Vector2(ARM_LEN, T))  # W top
+	_add_fort_wall(Vector2(-_apo - ARM_LEN * 0.5,  hw),  Vector2(ARM_LEN, T))  # W bottom
+	_add_fort_wall(Vector2(0.0, _apo + SOUTH_H * 0.5),   Vector2(SOUTH_W, SOUTH_H))  # South
 
-	# Corner gap-fillers (regular static bodies)
-	_add_wall_seg(Vector2( hw,              -_apo),  Vector2( _apo,              -hw))  # NE
-	_add_wall_seg(Vector2(-_apo,            -hw),    Vector2(-hw,               -_apo)) # NW
-	_add_wall_seg(Vector2( _apo,             hw),    Vector2( SOUTH_W * 0.5,    _apo))  # SE
-	_add_wall_seg(Vector2(-SOUTH_W * 0.5,   _apo),  Vector2(-_apo,              hw))   # SW
+	# Octagon face junction segments (arm edges → octagon diagonal vertices)
+	_add_wall_seg(Vector2(-v6x, -_apo), Vector2(-hw, -_apo))   # N face left
+	_add_wall_seg(Vector2( hw,  -_apo), Vector2( v6x, -_apo))  # N face right
+	_add_wall_seg(Vector2(_apo, -v6x),  Vector2(_apo,  -hw))   # E face top
+	_add_wall_seg(Vector2(_apo,  hw),   Vector2(_apo,   v6x))  # E face bottom
+	_add_wall_seg(Vector2(-_apo, -v6x), Vector2(-_apo, -hw))   # W face top
+	_add_wall_seg(Vector2(-_apo,  hw),  Vector2(-_apo,  v6x))  # W face bottom
+
+	# Octagon diagonal faces (fully solid)
+	_add_wall_seg(Vector2( v6x, -_apo), Vector2( _apo, -v6x))  # NE: V6 → V7
+	_add_wall_seg(Vector2(-_apo, -v6x), Vector2(-v6x, -_apo))  # NW: V4 → V5
+	_add_wall_seg(Vector2( _apo,  v6x), Vector2( v6x,  _apo))  # SE: V0 → V1
+	_add_wall_seg(Vector2(-v6x,  _apo), Vector2(-_apo,  v6x))  # SW: V2 → V3
 
 
 func _add_fort_wall(local_center: Vector2, wall_size: Vector2) -> void:
