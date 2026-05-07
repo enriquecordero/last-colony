@@ -59,6 +59,61 @@ func is_closing() -> bool:
 	return _closing
 
 func _draw() -> void:
+	# ── Ruinas humanas (contexto: madriguera irrumpe a través de estructura) ──
+	var rc      := Color(0.17, 0.13, 0.10)
+	var rhi     := Color(0.28, 0.22, 0.16)
+	var crack_c := Color(0.07, 0.05, 0.04)
+	var rebar_c := Color(0.42, 0.36, 0.28)
+
+	# Losa de concreto agrietada
+	var slab := PackedVector2Array([
+		Vector2(-58, 22), Vector2(-40, 32), Vector2(42, 32),
+		Vector2(60, 22),  Vector2(54, -26), Vector2(-52, -24)
+	])
+	draw_polygon(slab, PackedColorArray([Color(0.14, 0.11, 0.09)]))
+	draw_line(Vector2.ZERO, Vector2(-40, 26), crack_c, 1.2)
+	draw_line(Vector2.ZERO, Vector2(46, 24),  crack_c, 1.2)
+	draw_line(Vector2.ZERO, Vector2(-24, -28), crack_c, 1.0)
+	draw_line(Vector2(8, 10), Vector2(30, 28),  crack_c, 0.8)
+	draw_line(Vector2(-6, -12), Vector2(-28, 6), crack_c, 0.8)
+
+	# Pared izquierda — fragmento con tope dentado
+	var lw := PackedVector2Array([
+		Vector2(-62, 28), Vector2(-40, 28),
+		Vector2(-40, -22), Vector2(-45, -36),
+		Vector2(-52, -28), Vector2(-58, -14), Vector2(-62, 0)
+	])
+	draw_polygon(lw, PackedColorArray([rc]))
+	draw_polyline(PackedVector2Array([
+		Vector2(-40, 28), Vector2(-40, -22),
+		Vector2(-45, -36), Vector2(-52, -28)
+	]), rhi, 1.5)
+	for bi in 3:
+		draw_line(Vector2(-60, -4 + bi * 10), Vector2(-42, -4 + bi * 10),
+				Color(0.10, 0.08, 0.06, 0.5), 0.8)
+	draw_line(Vector2(-45, -36), Vector2(-43, -50), rebar_c, 1.5)
+	draw_line(Vector2(-48, -30), Vector2(-54, -44), rebar_c, 1.5)
+
+	# Pared derecha — más derrumbada
+	var rw := PackedVector2Array([
+		Vector2(38, 28), Vector2(60, 28),
+		Vector2(60, 6), Vector2(56, -8),
+		Vector2(48, -20), Vector2(42, -10), Vector2(38, 28)
+	])
+	draw_polygon(rw, PackedColorArray([rc]))
+	draw_polyline(PackedVector2Array([
+		Vector2(38, 28), Vector2(38, -10),
+		Vector2(44, -20), Vector2(48, -20)
+	]), rhi, 1.5)
+	for bi in 2:
+		draw_line(Vector2(40, 6 + bi * 10), Vector2(58, 6 + bi * 10),
+				Color(0.10, 0.08, 0.06, 0.5), 0.8)
+	draw_line(Vector2(48, -20), Vector2(51, -34), rebar_c, 1.5)
+
+	# Escombros
+	for rd in [Vector2(-28, 20), Vector2(28, 18), Vector2(-14, 26)]:
+		draw_circle(rd, 4.0 + sin(_t * 0.7 + rd.x) * 0.3, rc.darkened(0.18))
+
 	var pulse := 0.6 + sin(_t * 3.0) * 0.25
 	# Color se vuelve más rojo con cada escalada
 	var rr  := lerpf(0.55, 1.0, escalation / 3.0)

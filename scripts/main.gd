@@ -27,6 +27,8 @@ const Satellite       = preload("res://scripts/satellite.gd")
 const ResearchCache   = preload("res://scripts/research_cache.gd")
 const Burrow          = preload("res://scripts/burrow.gd")
 const Engendro        = preload("res://scripts/engendro.gd")
+const BossArena       = preload("res://scripts/boss_arena.gd")
+const RuinsDecor      = preload("res://scripts/ruins_decor.gd")
 
 const NPCAssault  = preload("res://scripts/npc_assault.gd")
 const NPCMedic    = preload("res://scripts/npc_medic.gd")
@@ -433,6 +435,7 @@ func _setup_mission_runtime() -> void:
 
 	_spawn_pre_populate(mission.pre_populate_enemies)
 	_spawn_mission_objects(mission)
+	_spawn_ruins_decor()
 
 	_mission_runtime = _MissionRuntime.new()
 	_mission_runtime.mission = mission
@@ -620,6 +623,31 @@ func _pick_cache_pos(existing: Array) -> Vector2:
 			return pos
 	return BASE_POS + Vector2(450.0, 0.0).rotated(randf() * TAU)
 
+func _spawn_ruins_decor() -> void:
+	const TYPES      := 3
+	const COUNT      := 12
+	const MIN_DIST   := 220.0
+	var placed: Array = []
+	for i in COUNT:
+		for _j in 40:
+			var pos := Vector2(
+				randf_range(200.0, MAP_W - 200.0),
+				randf_range(200.0, MAP_H - 200.0))
+			if pos.distance_to(BASE_POS) < 380.0:
+				continue
+			var ok := true
+			for ep in placed:
+				if pos.distance_to(ep) < MIN_DIST:
+					ok = false
+					break
+			if ok:
+				placed.append(pos)
+				var decor := RuinsDecor.new()
+				decor.position  = pos
+				decor.decor_type = i % TYPES
+				_mission_objects.add_child(decor)
+				break
+
 func _on_satellite_activated(_sat: Node) -> void:
 	_sats_activated += 1
 	if _sats_activated >= 2:
@@ -679,8 +707,13 @@ func _spawn_cache_ambush(cache_num: int) -> void:
 		_enemies.add_child(e)
 
 func _spawn_boss() -> void:
+	var boss_pos := _pick_far_spawn_pos()
+	var arena := BossArena.new()
+	arena.position = boss_pos + Vector2(0, 30)
+	_mission_objects.add_child(arena)
+
 	_boss                  = Engendro.new()
-	_boss.position         = _pick_far_spawn_pos()
+	_boss.position         = boss_pos
 	_boss.player           = _player
 	_boss.base_pos         = BASE_POS
 	_boss.bullet_container = _bullets

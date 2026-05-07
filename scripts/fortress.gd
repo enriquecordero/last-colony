@@ -427,6 +427,9 @@ func _draw() -> void:
 	# 11) Antenas con LED rojo en plataformas y torre
 	_draw_antennas()
 
+	# 12) Detalles de búnker humano repropuesto
+	_draw_bunker_details(c)
+
 
 func _draw_arm_walls() -> void:
 	# Brazo N — paredes verticales (laterales) con apertura al final (la puerta)
@@ -637,6 +640,91 @@ func _draw_antennas() -> void:
 		Color(0.36, 0.41, 0.47), 1.5)
 	draw_circle(tower_top + Vector2(0, -24), 2.5,
 		Color(1.0, 0.22, 0.22, pulse_red))
+
+
+func _draw_bunker_details(c: Vector2) -> void:
+	var sand   := Color(0.45, 0.38, 0.24)
+	var sand_d := Color(0.32, 0.26, 0.16)
+	var metal  := Color(0.30, 0.28, 0.24)
+	var metal_hi := Color(0.50, 0.46, 0.38)
+	var hazard := Color(0.72, 0.55, 0.0, 0.55)
+
+	# ── Sacos de arena en cada puerta ──────────────────────────────────────
+	# Puerta N — sacos a ambos lados de la apertura
+	var gn: Vector2 = door_centers["N"] - global_position
+	for s: float in [-1.0, 1.0]:
+		for i in 3:
+			var bx: float = gn.x + s * (36.0 + i * 10.0)
+			draw_circle(Vector2(bx, gn.y - 1),      5.5, sand_d)
+			draw_circle(Vector2(bx, gn.y - 8),      5.0, sand)
+			draw_circle(Vector2(bx + s * 3, gn.y - 4), 4.5, sand_d)
+
+	# Puerta E
+	var ge: Vector2 = door_centers["E"] - global_position
+	for s: float in [-1.0, 1.0]:
+		for i in 3:
+			var by: float = ge.y + s * (36.0 + i * 10.0)
+			draw_circle(Vector2(ge.x + 1, by),      5.5, sand_d)
+			draw_circle(Vector2(ge.x + 8, by),      5.0, sand)
+			draw_circle(Vector2(ge.x + 4, by + s * 3), 4.5, sand_d)
+
+	# Puerta W
+	var gw: Vector2 = door_centers["W"] - global_position
+	for s: float in [-1.0, 1.0]:
+		for i in 3:
+			var by: float = gw.y + s * (36.0 + i * 10.0)
+			draw_circle(Vector2(gw.x - 1, by),      5.5, sand_d)
+			draw_circle(Vector2(gw.x - 8, by),      5.0, sand)
+			draw_circle(Vector2(gw.x - 4, by + s * 3), 4.5, sand_d)
+
+	# ── Generador en el piso del hex ───────────────────────────────────────
+	var gen_c := c + Vector2(55.0, 30.0)
+	# Cuerpo del generador
+	draw_rect(Rect2(gen_c + Vector2(-18, -12), Vector2(36, 24)), Color(0.18, 0.20, 0.16))
+	draw_rect(Rect2(gen_c + Vector2(-18, -12), Vector2(36, 24)), metal_hi, false, 1.5)
+	# Rejilla de ventilación
+	for vi in 4:
+		draw_line(gen_c + Vector2(-14, -8 + vi * 5),
+				  gen_c + Vector2(4, -8 + vi * 5), metal, 0.8)
+	# Panel de control
+	draw_rect(Rect2(gen_c + Vector2(6, -10), Vector2(10, 20)), Color(0.22, 0.24, 0.20))
+	draw_circle(gen_c + Vector2(11, -4), 2.5, Color(0.0, 0.9, 0.3,
+			0.8 + 0.2 * sin(_pulse_t * 4.2)))
+	draw_circle(gen_c + Vector2(11, 4),  1.8, Color(0.9, 0.5, 0.0, 0.75))
+	# Tubos de escape
+	draw_line(gen_c + Vector2(-10, -12), gen_c + Vector2(-10, -22), metal, 3.5)
+	draw_line(gen_c + Vector2(-4,  -12), gen_c + Vector2( -4, -20), metal, 3.5)
+	draw_arc(gen_c + Vector2(-7, -22), 3.5, PI, TAU, 8, metal_hi, 3.5)
+
+	# ── Franjas de peligro en muralla sur ──────────────────────────────────
+	var sw_local := Rect2(south_wall_rect.position - global_position, south_wall_rect.size)
+	for si in 10:
+		var sx: float = sw_local.position.x + 6.0 + si * 36.0
+		if sx + 18.0 > sw_local.position.x + sw_local.size.x - 6.0:
+			break
+		if (si % 2) == 0:
+			var stripe_pts := PackedVector2Array([
+				Vector2(sx,        sw_local.position.y + 6),
+				Vector2(sx + 18.0, sw_local.position.y + 6),
+				Vector2(sx + 14.0, sw_local.position.y + sw_local.size.y - 6),
+				Vector2(sx - 4.0,  sw_local.position.y + sw_local.size.y - 6),
+			])
+			draw_colored_polygon(stripe_pts, hazard)
+
+	# ── Marcas de panel en brazos ──────────────────────────────────────────
+	for k in arm_polygons:
+		var poly: Array = arm_polygons[k]
+		var mid_pt: Vector2 = Vector2.ZERO
+		for v in poly:
+			mid_pt += v as Vector2
+		mid_pt = mid_pt / float(poly.size()) - global_position
+		draw_rect(Rect2(mid_pt + Vector2(-8, -8), Vector2(16, 16)),
+				Color(0, 0, 0, 0), false)
+		draw_arc(mid_pt, 6.0, 0, TAU, 10, metal * Color(1,1,1,0.5), 1.0)
+		draw_line(mid_pt + Vector2(-9, 0), mid_pt + Vector2(9, 0),
+				metal * Color(1,1,1,0.4), 0.8)
+		draw_line(mid_pt + Vector2(0, -9), mid_pt + Vector2(0, 9),
+				metal * Color(1,1,1,0.4), 0.8)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
