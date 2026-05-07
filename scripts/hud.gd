@@ -362,7 +362,7 @@ func update_enemy_progress(killed: int, total: int) -> void:
 	var pct := float(killed) / float(total)
 	var bar_len := 12
 	var filled  := int(pct * bar_len)
-	var bar     := "█".repeat(filled) + "░".repeat(bar_len - filled)
+	var bar     := ("█".repeat(filled) if filled > 0 else "") + ("░".repeat(bar_len - filled) if bar_len - filled > 0 else "")
 	_enemy_progress.text = "%d/%d  %s" % [killed, total, bar]
 	if pct >= 0.8:
 		_enemy_progress.add_theme_color_override("font_color", Color(0.35, 1.0, 0.45))

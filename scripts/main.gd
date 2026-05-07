@@ -1185,7 +1185,7 @@ func _spawn_crates() -> void:
 		c.picked_up.connect(_on_crate_picked_up)
 		_crates.add_child(c)
 	var is_boss := (_wave % 5 == 0)
-	if is_boss or randf() < 0.40:
+	if is_boss or randf() < 0.18:
 		var pos := _random_crate_pos(spawned)
 		var c    := Crate.new()
 		c.type       = Crate.Type.BOMB
@@ -1230,12 +1230,16 @@ func _use_bomb() -> void:
 		return
 	_bomb_count -= 1
 	_hud.update_bomb(_bomb_count)
-	var snapshot := _enemies.get_children()
-	for e in snapshot:
+	var center: Vector2 = _player.global_position if is_instance_valid(_player) else BASE_POS
+	const BOMB_RADIUS := 480.0
+	const BOMB_DMG    := 350
+	for e in _enemies.get_children():
 		if is_instance_valid(e) and e.has_method("take_damage"):
-			e.take_damage(9999)
+			if e.global_position.distance_to(center) <= BOMB_RADIUS:
+				e.take_damage(BOMB_DMG)
 	var ef      := BombEffect.new()
-	ef.position  = _player.global_position if is_instance_valid(_player) else BASE_POS
+	ef.position  = center
+	ef.max_r     = BOMB_RADIUS * 0.85
 	add_child(ef)
 	shake(22.0)
 
@@ -1316,7 +1320,7 @@ func _spawn_wave() -> void:
 	# SURVIVAL: overwhelm — necesitas torres, minas y NPCs para sobrevivir
 	var hp_mult:  float = 1.0 + (_wave - 1) * (0.55 if is_survival else 0.38)
 	var base_spd: float = (115.0 + (_wave - 1) * 25.0) if is_survival else (95.0 + (_wave - 1) * 20.0)
-	var count:    int   = (90 + _wave * 45) if is_survival else (22 + _wave * 9)
+	var count:    int   = (90 + _wave * 45) if is_survival else (34 + _wave * 14)
 	var interval: float = 0.055 if is_survival else 0.17
 
 	_wave_total = count
