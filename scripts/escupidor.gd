@@ -1,6 +1,7 @@
 extends "res://scripts/larva.gd"
 
-const EnemyProj   = preload("res://scripts/enemy_projectile.gd")
+const EnemyProj = preload("res://scripts/enemy_projectile.gd")
+const AcidPool  = preload("res://scripts/acid_pool.gd")
 const SHOOT_RANGE = 210.0
 const SHOOT_RATE  = 2.2
 
@@ -99,3 +100,7 @@ func _fire_at(target_pos: Vector2) -> void:
 	p.global_position  = global_position
 	p.direction        = (target_pos - global_position).normalized()
 	bullet_container.call_deferred("add_child", p)
+	var pool := AcidPool.new()
+	pool.global_position = target_pos
+	pool.player          = player
+	bullet_container.call_deferred("add_child", pool)

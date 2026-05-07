@@ -17,10 +17,11 @@ const _UPG_INFO := [
 ]
 
 const _BUILD_INFO := [
-	{"name": "MURO",     "cost": 3,  "key": "B", "color": Color(0.70, 0.90, 0.70)},
-	{"name": "TORRETA",  "cost": 8,  "key": "T", "color": Color(1.00, 0.75, 0.20)},
-	{"name": "MURO +",   "cost": 5,  "key": "N", "color": Color(0.50, 1.00, 0.55)},
-	{"name": "MINA",     "cost": 3,  "key": "M", "color": Color(0.90, 0.50, 0.90)},
+	{"name": "MURO",      "cost": 3,  "key": "B", "color": Color(0.70, 0.90, 0.70)},
+	{"name": "TORRETA",   "cost": 8,  "key": "T", "color": Color(1.00, 0.75, 0.20)},
+	{"name": "MURO +",    "cost": 5,  "key": "N", "color": Color(0.50, 1.00, 0.55)},
+	{"name": "MINA",      "cost": 3,  "key": "M", "color": Color(0.90, 0.50, 0.90)},
+	{"name": "BARRICADA", "cost": 4,  "key": "C", "color": Color(0.85, 0.75, 0.45)},
 ]
 
 var _hp_lbl:          Label
@@ -174,7 +175,7 @@ func _build() -> void:
 	_build_panel.add_child(_build_time_lbl)
 
 	# Build cards row
-	var card_w := 172.0
+	var card_w := 141.0
 	var card_h := 62.0
 	var card_x := 10.0
 	var gap    := 8.0
@@ -231,25 +232,26 @@ func _build() -> void:
 	utitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_upg_panel.add_child(utitle)
 
+	var upg_w := 172.0
 	for i in _UPG_INFO.size():
 		var info: Dictionary = _UPG_INFO[i]
 		var card := Panel.new()
-		card.size     = Vector2(card_w, 58)
-		card.position = Vector2(card_x + i * (card_w + gap), 22)
+		card.size     = Vector2(upg_w, 58)
+		card.position = Vector2(card_x + i * (upg_w + gap), 22)
 		_upg_panel.add_child(card)
 		_upg_cards.append(card)
 
 		var name_lbl := _lbl(info["name"], 14)
 		name_lbl.add_theme_color_override("font_color", info["color"])
 		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		name_lbl.size         = Vector2(card_w, 24)
+		name_lbl.size         = Vector2(upg_w, 24)
 		name_lbl.position     = Vector2(0, 5)
 		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(name_lbl)
 
 		var cost_lbl := _lbl("", 11)
 		cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		cost_lbl.size         = Vector2(card_w, 18)
+		cost_lbl.size         = Vector2(upg_w, 18)
 		cost_lbl.position     = Vector2(0, 32)
 		cost_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(cost_lbl)

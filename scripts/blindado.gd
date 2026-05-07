@@ -1,11 +1,65 @@
 extends "res://scripts/larva.gd"
 
+const CHARGE_SPEED    := 380.0
+const CHARGE_DURATION := 0.38
+const CHARGE_COOLDOWN := 6.0
+const STUCK_THRESHOLD := 2.8
+
+var _charge_cd: float   = 4.0
+var _charge_t:  float   = 0.0
+var _charging:  bool    = false
+var _last_pos:  Vector2 = Vector2.ZERO
+var _stuck_t:   float   = 0.0
+
 func _ready() -> void:
 	max_hp       = 400
 	melee_damage = 40
 	body_color   = Color(0.3, 0.32, 0.38)
 	body_radius  = 20.0
 	super._ready()
+
+func _physics_process(delta: float) -> void:
+	_charge_cd -= delta
+	if _charging:
+		_charge_t -= delta
+		velocity   = _draw_dir * CHARGE_SPEED
+		move_and_slide()
+		if velocity.length_squared() > 1.0:
+			_draw_dir = velocity.normalized()
+		_wall_dmg_cd -= delta
+		if _wall_dmg_cd <= 0.0:
+			for ci in get_slide_collision_count():
+				var col  := get_slide_collision(ci)
+				var body := col.get_collider()
+				if is_instance_valid(body) and (body.collision_layer & 8) and body.has_method("take_damage"):
+					body.take_damage(80)
+					_wall_dmg_cd = DAMAGE_INTERVAL
+					break
+		_dmg_cd -= delta
+		if _dmg_cd <= 0.0:
+			_try_melee_proximity()
+		if _charge_t <= 0.0:
+			_charging  = false
+			_charge_cd = CHARGE_COOLDOWN
+		queue_redraw()
+		return
+	var moved := global_position.distance_to(_last_pos)
+	_last_pos  = global_position
+	if moved < 5.0 * delta:
+		_stuck_t += delta
+	else:
+		_stuck_t = 0.0
+	if _charge_cd <= 0.0 and _stuck_t >= STUCK_THRESHOLD and is_instance_valid(player):
+		_stuck_t  = 0.0
+		_charging = true
+		_charge_t = CHARGE_DURATION
+		_draw_dir = (player.global_position - global_position).normalized()
+		modulate  = Color(1.8, 0.4, 0.4)
+		var tw := create_tween()
+		tw.tween_property(self, "modulate", Color.WHITE, 0.3)
+		queue_redraw()
+		return
+	super._physics_process(delta)
 
 func _draw_body() -> void:
 	var d := _draw_dir

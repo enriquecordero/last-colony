@@ -7,10 +7,12 @@ signal weapon_changed(wname: String)
 signal ammo_changed(wname: String, mag: int, mag_max: int, reserve: int, reserve_max: int, reloading: bool)
 signal elevation_changed(level: int)
 signal stair_state_changed(can_climb: bool, target_level: int)
+signal rocket_fired(rocket: Node)
 
 const BULLET_SCENE = preload("res://scenes/bullet.tscn")
+const Rocket       = preload("res://scripts/rocket.gd")
 
-enum Weapon { RIFLE, SHOTGUN }
+enum Weapon { RIFLE, SHOTGUN, ROCKET }
 
 # ── Munición ──
 const RIFLE_MAG_SIZE      := 30
@@ -19,6 +21,9 @@ const RIFLE_RELOAD_TIME   := 1.5
 const SHOTGUN_MAG_SIZE    := 6
 const SHOTGUN_MAX_RESERVE := 18
 const SHOTGUN_RELOAD_TIME := 2.0
+const ROCKET_MAG_SIZE     := 1
+const ROCKET_MAX_RESERVE  := 4
+const ROCKET_RELOAD_TIME  := 0.6
 
 # ── Bonus por elevación ──
 # Nivel:    0      1      2      3
@@ -47,8 +52,11 @@ var _rifle_mag:       int   = RIFLE_MAG_SIZE
 var _rifle_reserve:   int   = RIFLE_MAX_RESERVE
 var _shotgun_mag:     int   = SHOTGUN_MAG_SIZE
 var _shotgun_reserve: int   = SHOTGUN_MAX_RESERVE
+var _rocket_mag:      int   = ROCKET_MAG_SIZE
+var _rocket_reserve:  int   = 0
 var _reloading:       bool  = false
 var _reload_t:        float = 0.0
+var _damage_mult:     float = 1.0
 
 # Elevación
 var _elevation_level: int     = 0
@@ -114,8 +122,12 @@ func _draw() -> void:
 
 	# Arco de recarga
 	if _reloading:
-		var total: float = RIFLE_RELOAD_TIME if _weapon == Weapon.RIFLE else SHOTGUN_RELOAD_TIME
-		var pct: float   = clampf(1.0 - _reload_t / total, 0.0, 1.0)
+		var total: float
+		match _weapon:
+			Weapon.RIFLE:   total = RIFLE_RELOAD_TIME
+			Weapon.SHOTGUN: total = SHOTGUN_RELOAD_TIME
+			Weapon.ROCKET:  total = ROCKET_RELOAD_TIME
+		var pct: float = clampf(1.0 - _reload_t / total, 0.0, 1.0)
 		draw_arc(Vector2.ZERO, 22, -PI / 2, -PI / 2 + TAU * pct, 32,
 			Color(1.0, 0.85, 0.2), 3.0)
 
@@ -160,7 +172,8 @@ func _physics_process(delta: float) -> void:
 				died.emit()
 
 	# Disparo
-	var rate := _shotgun_rate if _weapon == Weapon.SHOTGUN else _rifle_rate
+	var rate := _shotgun_rate if _weapon == Weapon.SHOTGUN \
+		else (0.8 if _weapon == Weapon.ROCKET else _rifle_rate)
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) \
 			and _fire_cd <= 0.0 and not building and not _reloading:
 		if _has_mag_ammo():
@@ -176,6 +189,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		match event.keycode:
 			KEY_1: _set_weapon(Weapon.RIFLE)
 			KEY_2: _set_weapon(Weapon.SHOTGUN)
+			KEY_3:
+				if _rocket_reserve > 0 or _rocket_mag > 0:
+					_set_weapon(Weapon.ROCKET)
 			KEY_R:
 				if _can_reload():
 					_start_reload()
@@ -268,7 +284,7 @@ func get_range_mult() -> float:
 
 func get_damage_mult() -> float:
 	var base: float = ELEV_DMG_MULT[clamp(_elevation_level, 0, 3)]
-	return base * (1.35 if taller_active else 1.0)
+	return base * (1.35 if taller_active else 1.0) * _damage_mult
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -284,7 +300,8 @@ func _set_weapon(w: Weapon) -> void:
 		queue_redraw()
 	_weapon  = w
 	_fire_cd = 0.0
-	weapon_changed.emit("RIFLE" if w == Weapon.RIFLE else "ESCOPETA")
+	const NAMES := ["RIFLE", "ESCOPETA", "COHETES"]
+	weapon_changed.emit(NAMES[w])
 	_emit_ammo()
 
 
@@ -300,10 +317,27 @@ func _move() -> void:
 func _shoot() -> void:
 	if not is_instance_valid(bullet_container):
 		return
-	SoundManager.play("shoot")
 	match _weapon:
-		Weapon.RIFLE:   _shoot_rifle()
-		Weapon.SHOTGUN: _shoot_shotgun()
+		Weapon.RIFLE:
+			SoundManager.play("shoot")
+			_shoot_rifle()
+		Weapon.SHOTGUN:
+			SoundManager.play("shoot")
+			_shoot_shotgun()
+		Weapon.ROCKET:
+			_shoot_rocket()
+
+
+func _shoot_rocket() -> void:
+	var r := Rocket.new()
+	r.global_position = global_position
+	r.direction       = (get_global_mouse_position() - global_position).normalized()
+	bullet_container.add_child(r)
+	rocket_fired.emit(r)
+	_rocket_mag -= 1
+	_emit_ammo()
+	if _rocket_mag <= 0 and _rocket_reserve > 0:
+		_start_reload()
 
 
 func _shoot_rifle() -> void:
@@ -343,47 +377,70 @@ func _shoot_shotgun() -> void:
 # ─────────────────────────────────────────────────────────────────────────────
 
 func _has_mag_ammo() -> bool:
-	return _rifle_mag > 0 if _weapon == Weapon.RIFLE else _shotgun_mag > 0
+	match _weapon:
+		Weapon.RIFLE:   return _rifle_mag > 0
+		Weapon.SHOTGUN: return _shotgun_mag > 0
+		Weapon.ROCKET:  return _rocket_mag > 0
+	return false
 
 func _can_reload() -> bool:
 	if _reloading:
 		return false
-	if _weapon == Weapon.RIFLE:
-		return _rifle_mag < RIFLE_MAG_SIZE and _rifle_reserve > 0
-	return _shotgun_mag < SHOTGUN_MAG_SIZE and _shotgun_reserve > 0
+	match _weapon:
+		Weapon.RIFLE:   return _rifle_mag < RIFLE_MAG_SIZE and _rifle_reserve > 0
+		Weapon.SHOTGUN: return _shotgun_mag < SHOTGUN_MAG_SIZE and _shotgun_reserve > 0
+		Weapon.ROCKET:  return _rocket_mag < ROCKET_MAG_SIZE and _rocket_reserve > 0
+	return false
 
 func _start_reload() -> void:
 	_reloading = true
-	_reload_t  = RIFLE_RELOAD_TIME if _weapon == Weapon.RIFLE else SHOTGUN_RELOAD_TIME
+	match _weapon:
+		Weapon.RIFLE:   _reload_t = RIFLE_RELOAD_TIME
+		Weapon.SHOTGUN: _reload_t = SHOTGUN_RELOAD_TIME
+		Weapon.ROCKET:  _reload_t = ROCKET_RELOAD_TIME
 	queue_redraw()
 	_emit_ammo()
 
 func _finish_reload() -> void:
 	_reloading = false
-	if _weapon == Weapon.RIFLE:
-		var needed: int = RIFLE_MAG_SIZE - _rifle_mag
-		var taken: int  = mini(needed, _rifle_reserve)
-		_rifle_mag     += taken
-		_rifle_reserve -= taken
-	else:
-		var needed: int = SHOTGUN_MAG_SIZE - _shotgun_mag
-		var taken: int  = mini(needed, _shotgun_reserve)
-		_shotgun_mag     += taken
-		_shotgun_reserve -= taken
+	match _weapon:
+		Weapon.RIFLE:
+			var needed: int = RIFLE_MAG_SIZE - _rifle_mag
+			var taken: int  = mini(needed, _rifle_reserve)
+			_rifle_mag     += taken
+			_rifle_reserve -= taken
+		Weapon.SHOTGUN:
+			var needed: int = SHOTGUN_MAG_SIZE - _shotgun_mag
+			var taken: int  = mini(needed, _shotgun_reserve)
+			_shotgun_mag     += taken
+			_shotgun_reserve -= taken
+		Weapon.ROCKET:
+			var needed: int = ROCKET_MAG_SIZE - _rocket_mag
+			var taken: int  = mini(needed, _rocket_reserve)
+			_rocket_mag     += taken
+			_rocket_reserve -= taken
 	queue_redraw()
 	_emit_ammo()
 
 func _emit_ammo() -> void:
-	if _weapon == Weapon.RIFLE:
-		ammo_changed.emit("RIFLE", _rifle_mag, RIFLE_MAG_SIZE,
-			_rifle_reserve, RIFLE_MAX_RESERVE, _reloading)
-	else:
-		ammo_changed.emit("ESCOPETA", _shotgun_mag, SHOTGUN_MAG_SIZE,
-			_shotgun_reserve, SHOTGUN_MAX_RESERVE, _reloading)
+	match _weapon:
+		Weapon.RIFLE:
+			ammo_changed.emit("RIFLE", _rifle_mag, RIFLE_MAG_SIZE,
+				_rifle_reserve, RIFLE_MAX_RESERVE, _reloading)
+		Weapon.SHOTGUN:
+			ammo_changed.emit("ESCOPETA", _shotgun_mag, SHOTGUN_MAG_SIZE,
+				_shotgun_reserve, SHOTGUN_MAX_RESERVE, _reloading)
+		Weapon.ROCKET:
+			ammo_changed.emit("COHETES", _rocket_mag, ROCKET_MAG_SIZE,
+				_rocket_reserve, ROCKET_MAX_RESERVE, _reloading)
 
 func add_ammo(rifle_amt: int = 0, shotgun_amt: int = 0) -> void:
 	_rifle_reserve   = mini(_rifle_reserve   + rifle_amt,   RIFLE_MAX_RESERVE)
 	_shotgun_reserve = mini(_shotgun_reserve + shotgun_amt, SHOTGUN_MAX_RESERVE)
+	_emit_ammo()
+
+func add_rockets(n: int) -> void:
+	_rocket_reserve = mini(_rocket_reserve + n, ROCKET_MAX_RESERVE)
 	_emit_ammo()
 
 func refill_ammo() -> void:
@@ -430,3 +487,35 @@ func take_damage(amount: int) -> void:
 	tw.tween_property(self, "modulate", Color.WHITE, 0.15)
 	if hp <= 0:
 		died.emit()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Meta-progresión
+# ─────────────────────────────────────────────────────────────────────────────
+
+func apply_meta_speed(level: int) -> void:
+	const BONUS := [0.0, 0.12, 0.22, 0.30]
+	var pct: float = BONUS[clamp(level, 0, 3)]
+	_speed = 200.0 * (1.0 + pct)
+
+func apply_meta_fire(level: int) -> void:
+	const MULT := [1.0, 0.85, 0.72, 0.60]
+	var m: float = MULT[clamp(level, 0, 3)]
+	_rifle_rate   = 0.125 * m
+	_shotgun_rate = 0.45  * m
+
+func apply_meta_armor(hp_bonus: int) -> void:
+	max_hp = 100 + hp_bonus
+	hp     = mini(hp + hp_bonus, max_hp)
+	health_changed.emit(hp)
+
+func apply_meta_ammo(level: int) -> void:
+	const EXTRA := [0, 30, 60, 90]
+	var bonus: int = EXTRA[clamp(level, 0, 3)]
+	_rifle_reserve   = RIFLE_MAX_RESERVE   + bonus
+	_shotgun_reserve = SHOTGUN_MAX_RESERVE + bonus / 3
+	_emit_ammo()
+
+func apply_meta_damage(level: int) -> void:
+	const MULT := [1.0, 1.15, 1.30, 1.50]
+	_damage_mult = MULT[clamp(level, 0, 3)]

@@ -67,6 +67,12 @@ func _build() -> void:
 	vbox.add_child(btn)
 
 func _go_to_hub() -> void:
+	var result  := StageManager.get_last_result()
+	var success := bool(result.get("success", false))
+	if success:
+		var chatarra := int(result.get("chatarra", 0))
+		if chatarra > 0:
+			StageManager.bank_chatarra(chatarra)
 	StageManager.selected_mission_id = ""
 	get_tree().change_scene_to_file("res://scenes/stage_select.tscn")
 

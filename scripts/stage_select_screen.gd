@@ -29,13 +29,16 @@ const COL_LOCKED    := Color(0.35, 0.35, 0.40)
 const COL_SURVIVAL  := Color(0.95, 0.40, 0.20)
 const COL_LINE      := Color(0.28, 0.42, 0.28, 0.65)
 
-var _selected_id:     String     = ""
+var _selected_id:      String     = ""
 var _survival_confirm: bool      = false
-var _card_panels:     Dictionary = {}
-var _deploy_panel:    Panel      = null
-var _deploy_name_lbl: Label      = null
-var _deploy_warn_lbl: Label      = null
-var _deploy_btn:      Button     = null
+var _card_panels:      Dictionary = {}
+var _deploy_panel:     Panel      = null
+var _deploy_name_lbl:  Label      = null
+var _deploy_warn_lbl:  Label      = null
+var _deploy_btn:       Button     = null
+var _meta_panel:       Panel      = null
+var _chatarra_lbl:     Label      = null
+var _meta_card_lbls:   Dictionary = {}
 
 func _ready() -> void:
 	_build()
@@ -58,11 +61,28 @@ func _build() -> void:
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(sub)
 
+	# Chatarra banked display
+	_chatarra_lbl = _lbl("CHATARRA: %d" % StageManager.chatarra_banked, 16, Color(0.3, 0.95, 0.55))
+	_chatarra_lbl.size     = Vector2(220, 24)
+	_chatarra_lbl.position = Vector2(VIEW_W - 230, 22)
+	_chatarra_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(_chatarra_lbl)
+
+	# Mejoras button
+	var meta_btn := Button.new()
+	meta_btn.text = "⚙  MEJORAS"
+	meta_btn.add_theme_font_size_override("font_size", 16)
+	meta_btn.size     = Vector2(150, 38)
+	meta_btn.position = Vector2(20, VIEW_H - 52)
+	meta_btn.pressed.connect(_toggle_meta_panel)
+	add_child(meta_btn)
+
 	var missions := StageRegistry.get_stage_missions("stage1")
 	for m in missions:
 		_build_card(m)
 
 	_build_deploy_panel()
+	_build_meta_panel()
 	queue_redraw()
 
 func _build_card(mission) -> void:
@@ -124,6 +144,133 @@ func _build_card(mission) -> void:
 			if event is InputEventMouseButton and event.pressed \
 					and event.button_index == MOUSE_BUTTON_LEFT:
 				_select_mission(mid))
+
+func _build_meta_panel() -> void:
+	_meta_panel          = Panel.new()
+	_meta_panel.size     = Vector2(780, 380)
+	_meta_panel.position = Vector2((VIEW_W - 780) * 0.5, (VIEW_H - 380) * 0.5)
+	_meta_panel.visible  = false
+	add_child(_meta_panel)
+
+	var title := _lbl("⚙  MEJORAS PERMANENTES", 22, Color(0.85, 0.90, 0.55))
+	title.size                 = Vector2(780, 34)
+	title.position             = Vector2(0, 10)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_meta_panel.add_child(title)
+
+	var close_btn := Button.new()
+	close_btn.text = "✕"
+	close_btn.add_theme_font_size_override("font_size", 18)
+	close_btn.size     = Vector2(36, 30)
+	close_btn.position = Vector2(736, 8)
+	close_btn.pressed.connect(_toggle_meta_panel)
+	_meta_panel.add_child(close_btn)
+
+	var chatarra_row := _lbl("Chatarra disponible: %d" % StageManager.chatarra_banked, 15, Color(0.3, 0.95, 0.55))
+	chatarra_row.size                 = Vector2(780, 22)
+	chatarra_row.position             = Vector2(0, 46)
+	chatarra_row.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_meta_panel.add_child(chatarra_row)
+	_meta_card_lbls["_chatarra_row"] = chatarra_row
+
+	var keys    := StageManager.META_TREE.keys()
+	var cols    := 3
+	var card_w  := 228.0
+	var card_h  := 100.0
+	var pad_x   := 14.0
+	var pad_y   := 76.0
+	var gap_x   := 12.0
+	var gap_y   := 12.0
+
+	for i in keys.size():
+		var key: String     = keys[i]
+		var info: Dictionary = StageManager.META_TREE[key]
+		var col_i: int = i % cols
+		var row_i: int = i / cols
+		var cx: float = pad_x + col_i * (card_w + gap_x)
+		var cy: float = pad_y + row_i * (card_h + gap_y)
+
+		var card := Panel.new()
+		card.size     = Vector2(card_w, card_h)
+		card.position = Vector2(cx, cy)
+		_meta_panel.add_child(card)
+
+		var ic: Color = info["color"]
+		var name_lbl := _lbl(info["label"], 15, ic)
+		name_lbl.size                 = Vector2(card_w, 26)
+		name_lbl.position             = Vector2(0, 8)
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(name_lbl)
+
+		var lv_lbl := _lbl("", 12, Color(0.75, 0.75, 0.75))
+		lv_lbl.size                 = Vector2(card_w, 20)
+		lv_lbl.position             = Vector2(0, 36)
+		lv_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(lv_lbl)
+		_meta_card_lbls[key + "_lv"] = lv_lbl
+
+		var cost_lbl := _lbl("", 12, Color(0.3, 0.95, 0.55))
+		cost_lbl.size                 = Vector2(card_w, 20)
+		cost_lbl.position             = Vector2(0, 56)
+		cost_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card.add_child(cost_lbl)
+		_meta_card_lbls[key + "_cost"] = cost_lbl
+
+		var buy_btn := Button.new()
+		buy_btn.text = "COMPRAR"
+		buy_btn.add_theme_font_size_override("font_size", 11)
+		buy_btn.size     = Vector2(card_w - 20, 22)
+		buy_btn.position = Vector2(10, 74)
+		card.add_child(buy_btn)
+		_meta_card_lbls[key + "_btn"] = buy_btn
+
+		var k: String = key
+		buy_btn.pressed.connect(func() -> void: _buy_meta(k))
+
+	_refresh_meta_cards()
+
+
+func _toggle_meta_panel() -> void:
+	_meta_panel.visible = not _meta_panel.visible
+	if _meta_panel.visible:
+		_refresh_meta_cards()
+
+
+func _buy_meta(key: String) -> void:
+	if StageManager.buy_meta(key):
+		_chatarra_lbl.text = "CHATARRA: %d" % StageManager.chatarra_banked
+		_refresh_meta_cards()
+
+
+func _refresh_meta_cards() -> void:
+	var row_lbl: Label = _meta_card_lbls.get("_chatarra_row")
+	if row_lbl:
+		row_lbl.text = "Chatarra disponible: %d" % StageManager.chatarra_banked
+
+	for key in StageManager.META_TREE.keys():
+		var info: Dictionary = StageManager.META_TREE[key]
+		var lv: int    = StageManager.get_meta_level(key)
+		var max_lv: int = int(info["max"])
+		var cost: int  = StageManager.get_meta_cost(key)
+
+		var lv_lbl: Label  = _meta_card_lbls.get(key + "_lv")
+		var cost_lbl: Label = _meta_card_lbls.get(key + "_cost")
+		var buy_btn: Button = _meta_card_lbls.get(key + "_btn")
+		if not lv_lbl or not cost_lbl or not buy_btn:
+			continue
+
+		lv_lbl.text = "Nivel %d / %d" % [lv, max_lv]
+		if StageManager.is_meta_maxed(key):
+			cost_lbl.text = "MÁXIMO"
+			cost_lbl.add_theme_color_override("font_color", Color(0.55, 0.55, 0.55))
+			buy_btn.disabled = true
+		else:
+			cost_lbl.text = "%d chatarra" % cost
+			var can_buy: bool = StageManager.chatarra_banked >= cost
+			cost_lbl.add_theme_color_override("font_color",
+				Color(0.3, 0.95, 0.55) if can_buy else Color(0.8, 0.3, 0.3))
+			buy_btn.disabled = not can_buy
+
 
 func _build_deploy_panel() -> void:
 	_deploy_panel          = Panel.new()

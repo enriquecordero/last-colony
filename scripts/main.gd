@@ -29,6 +29,8 @@ const Burrow          = preload("res://scripts/burrow.gd")
 const Engendro        = preload("res://scripts/engendro.gd")
 const BossArena       = preload("res://scripts/boss_arena.gd")
 const RuinsDecor      = preload("res://scripts/ruins_decor.gd")
+const Barricada       = preload("res://scripts/barricada.gd")
+const BarricadaPreview = preload("res://scripts/barricada_preview.gd")
 
 const NPCAssault  = preload("res://scripts/npc_assault.gd")
 const NPCMedic    = preload("res://scripts/npc_medic.gd")
@@ -57,7 +59,7 @@ const AMMO_DROP_CHANCE  := 0.15
 const AMMO_DROP_RIFLE   := 8
 const AMMO_DROP_SHOTGUN := 2
 
-enum BuildType { WALL, TURRET, WALL_PLUS, MINE }
+enum BuildType { WALL, TURRET, WALL_PLUS, MINE, BARRICADA }
 
 const BUILD_PHASE_TIME := 11.0
 const MAX_TURRETS      := 3
@@ -70,9 +72,10 @@ var _walls:           Node2D
 var _hud:             CanvasLayer
 var _camera:          Camera2D
 var _fortress:        Node2D
-var _wall_preview:    Node2D
-var _turret_preview:  Node2D
-var _mine_preview:    Node2D
+var _wall_preview:       Node2D
+var _turret_preview:     Node2D
+var _mine_preview:       Node2D
+var _barricada_preview:  Node2D
 var _crates:           Node2D
 var _mission_objects:  Node2D
 var _title_ol:        CanvasLayer
@@ -119,6 +122,7 @@ var _healed_this_phase: bool = false
 var _pause_layer: CanvasLayer = null
 var _paused:      bool        = false
 var _regen_t:     float       = 0.0
+var _event_cd:    float       = 70.0
 
 func _ready() -> void:
 	_build_scene()
@@ -186,6 +190,11 @@ func _build_scene() -> void:
 	_mine_preview.z_index = 10
 	_mine_preview.visible = false
 	add_child(_mine_preview)
+
+	_barricada_preview         = BarricadaPreview.new()
+	_barricada_preview.z_index = 10
+	_barricada_preview.visible = false
+	add_child(_barricada_preview)
 
 	_hud = HUD_SCENE.instantiate()
 	add_child(_hud)
@@ -378,6 +387,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				if _build_phase: _set_build_type(BuildType.WALL_PLUS)
 			KEY_M:
 				if _build_phase: _set_build_type(BuildType.MINE)
+			KEY_C:
+				if _build_phase: _set_build_type(BuildType.BARRICADA)
 			KEY_ESCAPE:
 				if _build_mode:
 					_set_build_mode(false)
@@ -416,6 +427,9 @@ func _dismiss_title() -> void:
 func _start_game() -> void:
 	_player.set_physics_process(true)
 	_player.set_process_unhandled_input(true)
+	if _player.has_signal("rocket_fired"):
+		_player.rocket_fired.connect(_on_rocket_fired)
+	_apply_meta_upgrades()
 	_setup_mission_runtime()
 	_start_build_phase()
 
@@ -844,6 +858,7 @@ func _physics_process(delta: float) -> void:
 	_tick_build_preview()
 	_tick_mission(delta)
 	_tick_regen(delta)
+	_tick_events(delta)
 
 func _tick_camera() -> void:
 	if _game_over:
@@ -994,11 +1009,12 @@ func _set_build_type(type: BuildType) -> void:
 		_set_build_mode(true)
 
 func _set_build_mode(on: bool) -> void:
-	_build_mode             = on
-	_player.building        = on
-	_wall_preview.visible   = on and (_build_type == BuildType.WALL or _build_type == BuildType.WALL_PLUS)
-	_turret_preview.visible = on and _build_type == BuildType.TURRET
-	_mine_preview.visible   = on and _build_type == BuildType.MINE
+	_build_mode                = on
+	_player.building           = on
+	_wall_preview.visible      = on and (_build_type == BuildType.WALL or _build_type == BuildType.WALL_PLUS)
+	_turret_preview.visible    = on and _build_type == BuildType.TURRET
+	_mine_preview.visible      = on and _build_type == BuildType.MINE
+	_barricada_preview.visible = on and _build_type == BuildType.BARRICADA
 	if on:
 		_wall_preview.modulate = Color(0.6, 1.0, 0.6) if _build_type == BuildType.WALL_PLUS else Color.WHITE
 		_active_preview().queue_redraw()
@@ -1012,6 +1028,7 @@ func _active_preview() -> Node2D:
 		BuildType.TURRET:    return _turret_preview
 		BuildType.WALL_PLUS: return _wall_preview
 		BuildType.MINE:      return _mine_preview
+		BuildType.BARRICADA: return _barricada_preview
 		_:                   return _wall_preview
 
 func _build_cost() -> int:
@@ -1019,6 +1036,7 @@ func _build_cost() -> int:
 		BuildType.TURRET:    return 18
 		BuildType.WALL_PLUS: return 5
 		BuildType.MINE:      return 3
+		BuildType.BARRICADA: return 4
 		_:                   return 3
 
 func _build_type_name() -> String:
@@ -1026,6 +1044,7 @@ func _build_type_name() -> String:
 		BuildType.TURRET:    return "TORRETA"
 		BuildType.WALL_PLUS: return "MURO +"
 		BuildType.MINE:      return "MINA"
+		BuildType.BARRICADA: return "BARRICADA"
 		_:                   return "MURO"
 
 func _place_structure() -> void:
@@ -1060,6 +1079,11 @@ func _place_structure() -> void:
 			var m := MINE_SCENE.instantiate()
 			m.position = pos
 			_walls.add_child(m)
+		BuildType.BARRICADA:
+			var b := Barricada.new()
+			b.position = pos
+			b.destroyed.connect(func(): pass)
+			_walls.add_child(b)
 	_biomasa -= cost
 	_hud.update_biomasa(_biomasa)
 	_hud.update_upgrades(_upg_speed, _upg_fire, _upg_armor, _healed_this_phase, _biomasa)
@@ -1505,6 +1529,9 @@ func _on_enemy_died(e: Node) -> void:
 		_player.add_ammo(AMMO_DROP_RIFLE, AMMO_DROP_SHOTGUN)
 		_spawn_ammo_text(e.global_position)
 
+	if hp_v >= 120 and randf() < 0.12 and is_instance_valid(_player) and _player.has_method("add_rockets"):
+		_player.add_rockets(1)
+
 	# Loot de enemigos grandes
 	var hp_v: int = int(raw) if raw != null else 0
 	if hp_v >= 300:
@@ -1597,3 +1624,120 @@ func _on_hp_changed(v: int) -> void:
 	_hud.update_hp(v)
 	SoundManager.play("damage")
 	shake(6.0)
+
+
+# ── Meta-progresión ───────────────────────────────────────────────────────────
+
+func _apply_meta_upgrades() -> void:
+	if not is_instance_valid(_player):
+		return
+	var speed_lv:  int = StageManager.get_meta_level("speed")
+	var fire_lv:   int = StageManager.get_meta_level("fire")
+	var armor_lv:  int = StageManager.get_meta_level("armor")
+	var ammo_lv:   int = StageManager.get_meta_level("ammo")
+	var damage_lv: int = StageManager.get_meta_level("damage")
+	var rocket_lv: int = StageManager.get_meta_level("rockets")
+	if speed_lv  > 0 and _player.has_method("apply_meta_speed"):  _player.apply_meta_speed(speed_lv)
+	if fire_lv   > 0 and _player.has_method("apply_meta_fire"):   _player.apply_meta_fire(fire_lv)
+	if ammo_lv   > 0 and _player.has_method("apply_meta_ammo"):   _player.apply_meta_ammo(ammo_lv)
+	if damage_lv > 0 and _player.has_method("apply_meta_damage"): _player.apply_meta_damage(damage_lv)
+	if armor_lv  > 0 and _player.has_method("apply_meta_armor"):
+		const ARMOR_BONUS := [0, 25, 50, 80]
+		_player.apply_meta_armor(ARMOR_BONUS[clamp(armor_lv, 0, 3)])
+		_hud.update_max_hp(_player.max_hp)
+		_hud.update_hp(_player.hp)
+	if rocket_lv > 0 and _player.has_method("add_rockets"):
+		const ROCKET_BONUS := [0, 1, 2, 4]
+		_player.add_rockets(ROCKET_BONUS[clamp(rocket_lv, 0, 3)])
+
+
+# ── Rocket handling ───────────────────────────────────────────────────────────
+
+func _on_rocket_fired(rocket: Node) -> void:
+	if is_instance_valid(rocket) and rocket.has_signal("exploded"):
+		rocket.exploded.connect(_on_rocket_exploded)
+
+func _on_rocket_exploded(pos: Vector2) -> void:
+	const ROCKET_RADIUS := 120.0
+	for e in _enemies.get_children():
+		if is_instance_valid(e) and e.has_method("take_damage"):
+			if e.global_position.distance_to(pos) <= ROCKET_RADIUS:
+				e.take_damage(150)
+	for s in _walls.get_children():
+		if is_instance_valid(s) and s.has_method("take_damage"):
+			if s.global_position.distance_to(pos) <= ROCKET_RADIUS * 0.5:
+				s.take_damage(40)
+	var ef     := BombEffect.new()
+	ef.position = pos
+	ef.max_r    = 140.0
+	ef.tint     = Color(1.0, 0.55, 0.15)
+	add_child(ef)
+	shake(14.0)
+	SoundManager.play("explode")
+
+
+# ── Dynamic mid-mission events ────────────────────────────────────────────────
+
+func _tick_events(delta: float) -> void:
+	if not _mission_active or _game_over or _build_phase:
+		return
+	if _is_beacon_mission() or _is_cache_mission() or _is_burrow_mission():
+		return
+	_event_cd -= delta
+	if _event_cd <= 0.0:
+		_event_cd = randf_range(55.0, 90.0)
+		_fire_random_event()
+
+func _fire_random_event() -> void:
+	var r := randf()
+	if   r < 0.30: _event_horda()
+	elif r < 0.55: _event_kit()
+	elif r < 0.75: _event_interferencia()
+	else:          _event_frenesi()
+
+func _event_horda() -> void:
+	_hud.show_npc_announcement("¡REFUERZOS ENEMIGOS!", Color(1.0, 0.25, 0.2))
+	shake(6.0)
+	var count: int = 12 + _wave * 4
+	for i in count:
+		await get_tree().create_timer(0.12 * i).timeout
+		if not is_instance_valid(self) or not _mission_active:
+			return
+		var e: CharacterBody2D
+		var r := randf()
+		if   r < 0.20: e = BLINDADO_SCENE.instantiate()
+		elif r < 0.45: e = ESCUPIDOR_SCENE.instantiate()
+		elif r < 0.65: e = SALTADORA_SCENE.instantiate()
+		else:          e = LARVA_SCENE.instantiate()
+		e.max_hp           = maxi(e.max_hp, int(float(e.max_hp) * (1.0 + _wave * 0.2)))
+		e.hp               = e.max_hp
+		e.player           = _player
+		e.base_pos         = BASE_POS
+		e.bullet_container = _bullets
+		if "fortress" in e: e.fortress = _fortress
+		e.died.connect(_on_enemy_died)
+		e.position         = _pick_spawn_pos()
+		_enemies.add_child(e)
+
+func _event_kit() -> void:
+	_hud.show_npc_announcement("¡KIT DE CAMPO DISPONIBLE!", Color(0.3, 1.0, 0.55))
+	_spawn_crates()
+
+func _event_interferencia() -> void:
+	_hud.show_npc_announcement("¡INTERFERENCIA — TORRETAS FUERA 8s!", Color(1.0, 0.75, 0.15))
+	for s in _walls.get_children():
+		if is_instance_valid(s) and s.get("_fire_cd") != null:
+			s.set("_fire_cd", 8.0)
+
+func _event_frenesi() -> void:
+	_hud.show_npc_announcement("¡FRENESÍ! ENEMIGOS ACELERADOS 12s", Color(1.0, 0.35, 0.80))
+	shake(5.0)
+	for e in _enemies.get_children():
+		if is_instance_valid(e) and e.get("speed") != null:
+			e.speed = float(e.speed) * 1.45
+	await get_tree().create_timer(12.0).timeout
+	if not is_instance_valid(self):
+		return
+	for e in _enemies.get_children():
+		if is_instance_valid(e) and e.get("speed") != null:
+			e.speed = float(e.speed) / 1.45
