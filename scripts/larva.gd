@@ -157,6 +157,9 @@ func _try_melee_proximity() -> void:
 
 func take_damage(amount: int) -> void:
 	hp -= amount
+	modulate = Color(1.8, 0.25, 0.25)
+	var tw := create_tween()
+	tw.tween_property(self, "modulate", Color.WHITE, 0.10)
 	queue_redraw()
 	if hp <= 0:
 		died.emit(self)

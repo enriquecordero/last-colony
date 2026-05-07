@@ -10,6 +10,7 @@ const LarvaScene     = preload("res://scenes/larva.tscn")
 const SaltadoraScene = preload("res://scenes/saltadora.tscn")
 const EscupidorScene = preload("res://scenes/escupidor.tscn")
 const BlindadoScene  = preload("res://scenes/blindado.tscn")
+const ExplosivoScene = preload("res://scenes/explosivo.tscn")
 
 var player:           Node2D
 var base_pos:         Vector2 = Vector2.ZERO
@@ -31,7 +32,7 @@ func _ready() -> void:
 	queue_redraw()
 
 func _get_spawn_interval() -> float:
-	return max(1.1, 4.5 - escalation * 1.1)
+	return max(0.65, 3.8 - escalation * 1.1)
 
 func _physics_process(delta: float) -> void:
 	_t        += delta
@@ -102,27 +103,31 @@ func _spawn_enemy() -> void:
 	var r := randf()
 	match escalation:
 		0:
-			if r < 0.30: e = SaltadoraScene.instantiate()
-			else:        e = LarvaScene.instantiate()
+			if   r < 0.15: e = ExplosivoScene.instantiate()
+			elif r < 0.40: e = SaltadoraScene.instantiate()
+			else:          e = LarvaScene.instantiate()
 		1:
-			if   r < 0.18: e = EscupidorScene.instantiate()
-			elif r < 0.48: e = SaltadoraScene.instantiate()
+			if   r < 0.18: e = ExplosivoScene.instantiate()
+			elif r < 0.36: e = EscupidorScene.instantiate()
+			elif r < 0.62: e = SaltadoraScene.instantiate()
 			else:          e = LarvaScene.instantiate()
 		2:
-			if   r < 0.22: e = BlindadoScene.instantiate()
-			elif r < 0.46: e = EscupidorScene.instantiate()
-			elif r < 0.66: e = SaltadoraScene.instantiate()
+			if   r < 0.20: e = BlindadoScene.instantiate()
+			elif r < 0.38: e = ExplosivoScene.instantiate()
+			elif r < 0.58: e = EscupidorScene.instantiate()
+			elif r < 0.75: e = SaltadoraScene.instantiate()
 			else:          e = LarvaScene.instantiate()
 		_:
-			if   r < 0.35: e = BlindadoScene.instantiate()
-			elif r < 0.62: e = EscupidorScene.instantiate()
-			elif r < 0.76: e = SaltadoraScene.instantiate()
+			if   r < 0.28: e = BlindadoScene.instantiate()
+			elif r < 0.48: e = ExplosivoScene.instantiate()
+			elif r < 0.68: e = EscupidorScene.instantiate()
+			elif r < 0.80: e = SaltadoraScene.instantiate()
 			else:          e = LarvaScene.instantiate()
 
-	var hp_mult := 1.0 + escalation * 0.55
+	var hp_mult := 1.0 + escalation * 0.80
 	e.max_hp           = maxi(e.max_hp, int(float(e.max_hp) * hp_mult))
 	e.hp               = e.max_hp
-	e.speed           *= 1.0 + escalation * 0.18
+	e.speed           *= 1.0 + escalation * 0.22
 	e.player           = player
 	e.base_pos         = base_pos
 	e.bullet_container = bullet_container

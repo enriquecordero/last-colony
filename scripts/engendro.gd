@@ -39,6 +39,9 @@ var _charge_rem: float  = 0.0
 var _phase2:     bool    = false
 var _sprite:     Sprite2D = null
 var _draw_dir:   Vector2  = Vector2.RIGHT
+var _dying:      bool    = false
+var _die_t:      float   = 0.0
+const DIE_DUR            := 1.1
 
 
 func _ready() -> void:
@@ -52,6 +55,13 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _dying:
+		_die_t += delta
+		queue_redraw()
+		if _die_t >= DIE_DUR:
+			died.emit(self)
+			queue_free()
+		return
 	_t += delta
 	if _charging:
 		_tick_charge(delta)
@@ -142,6 +152,8 @@ func _do_rugido() -> void:
 
 
 func take_damage(amount: int) -> void:
+	if _dying:
+		return
 	hp = max(0, hp - amount)
 	modulate = Color(1.5, 0.3, 0.3)
 	var tw := create_tween()
@@ -150,8 +162,16 @@ func take_damage(amount: int) -> void:
 	if not _phase2 and hp <= max_hp / 2:
 		_enter_phase2()
 	if hp <= 0:
-		died.emit(self)
-		queue_free()
+		_start_dying()
+
+func _start_dying() -> void:
+	_dying    = true
+	_die_t    = 0.0
+	velocity  = Vector2.ZERO
+	for c in get_children():
+		if c is CollisionShape2D:
+			c.disabled = true
+	SoundManager.play("explode")
 
 func _enter_phase2() -> void:
 	_phase2      = true
@@ -168,6 +188,13 @@ func _enter_phase2() -> void:
 
 
 func _draw() -> void:
+	if _dying:
+		var pct := minf(_die_t / DIE_DUR, 1.0)
+		var er  := 22.0 + pct * 120.0
+		draw_circle(Vector2.ZERO, er,        Color(1.0, 0.45 + pct * 0.2, 0.0, (1.0 - pct) * 0.85))
+		draw_circle(Vector2.ZERO, er * 0.55, Color(1.0, 0.92, 0.30,            (1.0 - pct)))
+		draw_arc(Vector2.ZERO, er * 1.15, 0, TAU, 48, Color(1.0, 0.6, 0.1, (1.0 - pct) * 0.5), 5.0)
+		return
 	var pulse_spd := 5.5 if _phase2 else 2.4
 	var pulse     := 0.82 + sin(_t * pulse_spd) * 0.18
 	var d         := _draw_dir

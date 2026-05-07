@@ -5,6 +5,7 @@ const LARVA_SCENE     = preload("res://scenes/larva.tscn")
 const SALTADORA_SCENE = preload("res://scenes/saltadora.tscn")
 const BLINDADO_SCENE  = preload("res://scenes/blindado.tscn")
 const ESCUPIDOR_SCENE = preload("res://scenes/escupidor.tscn")
+const EXPLOSIVO_SCENE = preload("res://scenes/explosivo.tscn")
 const HUD_SCENE       = preload("res://scenes/hud.tscn")
 const WALL_SCENE      = preload("res://scenes/wall.tscn")
 const TURRET_SCENE    = preload("res://scenes/turret.tscn")
@@ -683,8 +684,14 @@ func _spawn_boss() -> void:
 	_hud.show_npc_announcement("¡EL ENGENDRO HA LLEGADO!", Color(1.0, 0.25, 0.1))
 
 func _on_boss_died(e: Node) -> void:
+	var boss_pos: Vector2 = e.global_position
 	_boss = null
 	_on_enemy_died(e)
+	for i in 3:
+		var ef := BombEffect.new()
+		ef.position = boss_pos + Vector2(randf_range(-40, 40), randf_range(-40, 40))
+		add_child(ef)
+	shake(30.0)
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
 		_mission_runtime.notify_boss_killed()
 
@@ -706,7 +713,10 @@ func _on_boss_phase2() -> void:
 
 func _on_burrow_closed(_burrow: Node) -> void:
 	_burrows_closed += 1
-	# Escalar todas las madrigueras que quedan
+	var ef := BombEffect.new()
+	ef.position = _burrow.global_position
+	add_child(ef)
+	SoundManager.play("explode")
 	for obj in _mission_objects.get_children():
 		if is_instance_valid(obj) and obj.get("escalation") != null:
 			obj.escalation = _burrows_closed
@@ -714,7 +724,7 @@ func _on_burrow_closed(_burrow: Node) -> void:
 		1: _hud.announce_wave(_wave, "¡MADRIGUERA CERRADA — SE ENFURECEN!")
 		2: _hud.announce_wave(_wave, "¡MADRIGUERA CERRADA — RESISTENCIA CRECIENTE!")
 		3: _hud.announce_wave(_wave, "¡ÚLTIMA MADRIGUERA — RESISTENCIA MÁXIMA!")
-	shake(6.0 * _burrows_closed)
+	shake(8.0 * _burrows_closed)
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
 		_mission_runtime.notify_burrow_closed()
 
@@ -1236,9 +1246,9 @@ func _spawn_wave() -> void:
 	var is_survival: bool = _is_survival()
 
 	# SURVIVAL: overwhelm — necesitas torres, minas y NPCs para sobrevivir
-	var hp_mult:  float = 1.0 + (_wave - 1) * (0.45 if is_survival else 0.28)
-	var base_spd: float = (105.0 + (_wave - 1) * 22.0) if is_survival else (90.0 + (_wave - 1) * 18.0)
-	var count:    int   = (80 + _wave * 40) if is_survival else (18 + _wave * 6)
+	var hp_mult:  float = 1.0 + (_wave - 1) * (0.55 if is_survival else 0.38)
+	var base_spd: float = (115.0 + (_wave - 1) * 25.0) if is_survival else (95.0 + (_wave - 1) * 20.0)
+	var count:    int   = (90 + _wave * 45) if is_survival else (22 + _wave * 9)
 	var interval: float = 0.055 if is_survival else 0.17
 
 	_wave_total = count
@@ -1250,23 +1260,26 @@ func _spawn_wave() -> void:
 		if not _mission_active or not is_instance_valid(self):
 			return
 		var e: CharacterBody2D
+		var r := randf()
 		if is_survival:
-			var r := randf()
-			if _wave >= 2 and r < 0.22:
+			if _wave >= 2 and r < 0.20:
 				e = BLINDADO_SCENE.instantiate();   e.speed = base_spd * 0.55
-			elif r < 0.32:
+			elif _wave >= 2 and r < 0.34:
+				e = EXPLOSIVO_SCENE.instantiate();  e.speed = base_spd * 0.90
+			elif r < 0.46:
 				e = ESCUPIDOR_SCENE.instantiate();  e.speed = base_spd * 0.85
-			elif r < 0.55:
+			elif r < 0.65:
 				e = SALTADORA_SCENE.instantiate();  e.speed = base_spd * 1.9
 			else:
 				e = LARVA_SCENE.instantiate();      e.speed = base_spd
 		else:
-			var r := randf()
-			if _wave >= 4 and r < 0.15:
+			if _wave >= 4 and r < 0.14:
 				e = BLINDADO_SCENE.instantiate();   e.speed = base_spd * 0.55
 			elif _wave >= 2 and r < 0.28:
+				e = EXPLOSIVO_SCENE.instantiate();  e.speed = base_spd * 0.90
+			elif _wave >= 2 and r < 0.42:
 				e = ESCUPIDOR_SCENE.instantiate();  e.speed = base_spd * 0.85
-			elif _wave >= 2 and r < 0.35:
+			elif _wave >= 2 and r < 0.52:
 				e = SALTADORA_SCENE.instantiate();  e.speed = base_spd * 1.9
 			else:
 				e = LARVA_SCENE.instantiate();      e.speed = base_spd

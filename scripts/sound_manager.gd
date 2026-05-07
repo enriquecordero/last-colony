@@ -3,11 +3,13 @@ extends Node
 var _players: Dictionary = {}
 
 func _ready() -> void:
-	_add("shoot",  880.0, 660.0,  0.055, 0.28)
-	_add("death",  420.0, 100.0,  0.18,  0.52)
-	_add("damage", 130.0,  90.0,  0.13,  0.60)
-	_add("wave",   200.0, 520.0,  0.38,  0.42)
-	_add("wave2",  520.0, 260.0,  0.22,  0.35)
+	_add("shoot",   880.0, 660.0,  0.055, 0.28)
+	_add("death",   420.0, 100.0,  0.18,  0.52)
+	_add("damage",  130.0,  90.0,  0.13,  0.60)
+	_add("wave",    200.0, 520.0,  0.38,  0.42)
+	_add("wave2",   520.0, 260.0,  0.22,  0.35)
+	_add("explode",  55.0,  18.0,  0.45,  1.00)
+	_add("spawn",   310.0,  75.0,  0.20,  0.42)
 
 func play(key: String) -> void:
 	if _players.has(key):
