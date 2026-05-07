@@ -19,6 +19,7 @@ const FLAME_RATE   := 0.18
 var bullet_container: Node2D
 var enemies_node:     Node2D
 var walls_node:       Node2D
+var fortress:         Node2D
 
 var build_phase_active:  bool    = false
 var current_threat_dir:  Vector2 = Vector2.ZERO
@@ -175,11 +176,16 @@ func _apply_flame() -> void:
 	_flame_cd = FLAME_RATE
 
 func _find_repair_target() -> Node2D:
-	if not is_instance_valid(walls_node):
-		return null
 	var best: Node2D = null
 	var worst_pct := 0.70
-	for s in walls_node.get_children():
+
+	var candidates: Array = []
+	if is_instance_valid(walls_node):
+		candidates.append_array(walls_node.get_children())
+	if is_instance_valid(fortress) and fortress.has_method("get_damageable_walls"):
+		candidates.append_array(fortress.get_damageable_walls())
+
+	for s in candidates:
 		if not is_instance_valid(s):
 			continue
 		var hp_v:  Variant = s.get("hp")

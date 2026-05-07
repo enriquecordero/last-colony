@@ -1450,6 +1450,7 @@ func _spawn_engineer_npc() -> void:
 	_engineer_npc.bullet_container = _bullets
 	_engineer_npc.enemies_node     = _enemies
 	_engineer_npc.walls_node       = _walls
+	_engineer_npc.fortress         = _fortress
 	if _is_survival():
 		_engineer_npc.post_pos = _npc_spawn_pos(Vector2(0, -1))
 	_engineer_npc.died.connect(_on_npc_died)

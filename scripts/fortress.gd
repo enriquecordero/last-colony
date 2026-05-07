@@ -2,72 +2,44 @@ extends Node2D
 class_name Fortress
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Fortress — La fortaleza completa.
-# Reemplaza al BaseVisual + spawn_starting_walls.
-# Maneja geometría, dibujado, zonas de elevación, escaleras, puertas, slots.
-#
-# Estructura:
-#   - Hexágono central (piso 0)
-#   - 3 brazos cardinales (N, E, W) — piso 0, con puerta al final
-#   - Muralla SUR (piso 1) — sólida, sin puerta
-#   - 4 plataformas en vértices del hex (piso 1)
-#   - Torre central de 3 niveles sobre la muralla sur
-#   - Escaleras a cada zona elevada
-#   - 3 slots de construcción (taller, generador, enfermería)
+# Fortress — octagon central hub with N/E/W arm corridors and a solid south
+# wall. Arm side-walls and the south wall are damageable FortWall nodes so
+# enemies can breach them and the engineer has something to repair.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# La base se posiciona con position. Todas las coordenadas internas son relativas.
-# Usamos `center_offset` = Vector2.ZERO porque dibujamos centrado.
+const OCT_RADIUS := 120.0   # center → octagon vertex
+const ARM_W      := 66.0    # corridor width
+const ARM_LEN    := 120.0   # arm length from octagon face to door
+const SOUTH_W    := 200.0   # solid south wall width
+const SOUTH_H    := 44.0    # solid south wall height
+const TOWER_L2_W := 110.0
+const TOWER_L2_H := 48.0
+const TOWER_L3_W := 74.0
+const TOWER_L3_H := 42.0
+const STAIR_SIZE := 30.0
+const CORE_R     := 28.0
 
-# ── Geometría (en coordenadas locales relativas al centro) ──
-const HEX_RADIUS := 200.0   # tamaño del hexágono central
-const ARM_W      := 110.0   # ancho de cada brazo
-const ARM_LEN    := 185.0   # largo del brazo (desde el borde del hex)
-
-# Plataformas de torreta (esquinas del hex)
-const PLAT_SIZE  := 85.0
-
-# Muralla sur
-const SOUTH_W    := 390.0
-const SOUTH_H    := 52.0
-
-# Torre central (sobre muralla sur)
-const TOWER_L2_W := 135.0
-const TOWER_L2_H := 65.0
-const TOWER_L3_W := 90.0
-const TOWER_L3_H := 50.0
-
-# Escaleras
-const STAIR_SIZE := 34.0
-
-# Núcleo
-const CORE_R     := 30.0
-
-# ── Colores ──
+# ── Colors ──
 const COL_FLOOR_0      := Color(0.10, 0.13, 0.18)
 const COL_FLOOR_0_EDGE := Color(0.20, 0.26, 0.34)
 const COL_FLOOR_1      := Color(0.13, 0.17, 0.23)
 const COL_FLOOR_1_EDGE := Color(0.30, 0.40, 0.55)
 const COL_FLOOR_2      := Color(0.16, 0.22, 0.32)
 const COL_FLOOR_2_EDGE := Color(0.45, 0.60, 0.75)
-const COL_FLOOR_3      := Color(0.23, 0.34, 0.50)
-const COL_FLOOR_3_EDGE := Color(0.65, 0.78, 0.88)
-const COL_WALL         := Color(0.23, 0.27, 0.32)
+const COL_TOWER        := Color(0.24, 0.34, 0.50)
+const COL_TOWER_EDGE   := Color(0.66, 0.78, 0.88)
 const COL_WALL_EDGE    := Color(0.36, 0.41, 0.47)
 const COL_GATE_LINE    := Color(1.0,  0.85, 0.20, 0.85)
 const COL_AMBER        := Color(1.0,  0.55, 0.0)
-const COL_PLATFORM     := Color(0.12, 0.16, 0.22)
 const COL_STAIR        := Color(0.13, 0.20, 0.29)
 const COL_STAIR_EDGE   := Color(0.55, 0.70, 0.85)
 const COL_CORE_OUTER   := Color(0.0,  0.83, 1.0)
 const COL_CORE_INNER   := Color(0.55, 0.95, 1.0)
-const COL_TOWER        := Color(0.24, 0.34, 0.50)
-const COL_TOWER_EDGE   := Color(0.66, 0.78, 0.88)
+const COL_CRACK        := Color(0.92, 0.70, 0.30, 0.80)
 
-# ── Slots de estaciones ──
+# ── Station types ──
 enum StationType { TALLER, GENERATOR, ENFERMERIA }
 
-# Cada slot tiene posición relativa, color, label, y si está construida
 class Slot:
 	var pos:    Vector2
 	var size:   Vector2
@@ -78,28 +50,47 @@ class Slot:
 	var color:  Color
 	var label:  String
 
-# ── Datos calculados en _ready (en coords globales) ──
+# ── Damageable wall segment ──
+class FortWall extends StaticBody2D:
+	var hp:     int = 300
+	var max_hp: int = 300
+
+	func init_wall(wall_size: Vector2) -> void:
+		collision_layer = 8
+		collision_mask  = 0
+		var cs := CollisionShape2D.new()
+		var rs := RectangleShape2D.new()
+		rs.size  = wall_size
+		cs.shape = rs
+		add_child(cs)
+
+	func take_damage(amount: int) -> void:
+		hp = maxi(0, hp - amount)
+		if hp == 0:
+			for cs in get_children():
+				if cs is CollisionShape2D:
+					(cs as CollisionShape2D).disabled = true
+
+# ── Geometry (global coords) ──
 var hex_center:        Vector2
-var hex_vertices:      Array          # 6 puntos del hexágono central
-var arm_polygons:      Dictionary     # "N"/"E"/"W" -> Array de 4 puntos
-var door_centers:      Dictionary     # "N"/"E"/"W" -> Vector2
-var platform_polygons: Array          # 4 plataformas (NW, NE, SW, SE) - rects
+var hex_vertices:      Array
+var arm_polygons:      Dictionary
+var door_centers:      Dictionary
+var platform_polygons: Array = []
 var south_wall_rect:   Rect2
 var tower_l2_rect:     Rect2
 var tower_l3_rect:     Rect2
+var stair_zones:       Array = []
+var slots:             Array = []
 
-# Zonas de escalera: pares (rect, from_level, to_level)
-var stair_zones: Array = []
-
-# Slots de estaciones
-var slots: Array = []
-
-# Pulse animation timing
+var _apo: float   # OCT_RADIUS * cos(22.5°) ≈ 110.87
+var _fort_walls: Array = []
 var _pulse_t: float = 0.0
 
 
 func _ready() -> void:
 	z_index = 0
+	_apo = OCT_RADIUS * cos(deg_to_rad(22.5))
 	_build_geometry()
 	_build_collision()
 	set_process(true)
@@ -111,104 +102,66 @@ func _process(delta: float) -> void:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Geometría
+# Geometry
 # ─────────────────────────────────────────────────────────────────────────────
 
 func _build_geometry() -> void:
 	hex_center = global_position
+	var c  := hex_center
+	var hw := ARM_W * 0.5   # 33
 
-	# Hexágono central — 6 vértices (apuntando a los lados)
-	# Vértices a 0°, 60°, 120°, 180°, 240°, 300° desde el centro
-	# Pero queremos que tenga lados N, S y diagonales NE/NW/SE/SW.
-	# Con apex en N/S → puntos a 30°, 90°, 150°, 210°, 270°, 330°.
-	# Mejor para layout: planos N/S → 0°, 60°, 120°, 180°, 240°, 300°.
+	# Octagon vertices: 22.5 + 45*i degrees
+	# V0=(APO,46) V1=(46,APO) V2=(-46,APO) V3=(-APO,46)
+	# V4=(-APO,-46) V5=(-46,-APO) V6=(46,-APO) V7=(APO,-46)
+	# N-face midpoint: (0,-APO)  E: (APO,0)  S: (0,APO)  W: (-APO,0)
 	hex_vertices = []
-	for i in 6:
-		var a: float = deg_to_rad(60.0 * i)
-		hex_vertices.append(hex_center + Vector2(cos(a), sin(a)) * HEX_RADIUS)
-	# Esto da: V0 derecha, V1 abajo-derecha, V2 abajo-izquierda, V3 izquierda, V4 arriba-izquierda, V5 arriba-derecha
+	for i in 8:
+		var a: float = deg_to_rad(22.5 + 45.0 * float(i))
+		hex_vertices.append(c + Vector2(cos(a), sin(a)) * OCT_RADIUS)
 
-	# Brazos: salen de los lados del hexágono. El brazo NORTE sale del lado superior (entre V4 y V5).
-	# Centro del lado superior = (V4 + V5) / 2
-	var top_mid:    Vector2 = (hex_vertices[4] + hex_vertices[5]) * 0.5
-	var bottom_mid: Vector2 = (hex_vertices[1] + hex_vertices[2]) * 0.5
-	var right_mid:  Vector2 = hex_vertices[0]
-	var left_mid:   Vector2 = hex_vertices[3]
-
-	# Brazo NORTE — rectángulo 80×130 saliendo hacia arriba desde top_mid
-	var arm_n_base_l := Vector2(top_mid.x - ARM_W * 0.5, top_mid.y)
-	var arm_n_base_r := Vector2(top_mid.x + ARM_W * 0.5, top_mid.y)
-	var arm_n_top_l  := Vector2(top_mid.x - ARM_W * 0.5, top_mid.y - ARM_LEN)
-	var arm_n_top_r  := Vector2(top_mid.x + ARM_W * 0.5, top_mid.y - ARM_LEN)
 	arm_polygons = {
-		"N": [arm_n_base_l, arm_n_top_l, arm_n_top_r, arm_n_base_r],
-		"E": [right_mid, Vector2(right_mid.x + ARM_LEN, right_mid.y - ARM_W * 0.5),
-			  Vector2(right_mid.x + ARM_LEN, right_mid.y + ARM_W * 0.5), right_mid],
-		"W": [left_mid, Vector2(left_mid.x - ARM_LEN, left_mid.y - ARM_W * 0.5),
-			  Vector2(left_mid.x - ARM_LEN, left_mid.y + ARM_W * 0.5), left_mid],
+		"N": [
+			c + Vector2(-hw,        -_apo),
+			c + Vector2(-hw,        -_apo - ARM_LEN),
+			c + Vector2( hw,        -_apo - ARM_LEN),
+			c + Vector2( hw,        -_apo),
+		],
+		"E": [
+			c + Vector2(_apo,            -hw),
+			c + Vector2(_apo + ARM_LEN,  -hw),
+			c + Vector2(_apo + ARM_LEN,   hw),
+			c + Vector2(_apo,             hw),
+		],
+		"W": [
+			c + Vector2(-_apo - ARM_LEN, -hw),
+			c + Vector2(-_apo,           -hw),
+			c + Vector2(-_apo,            hw),
+			c + Vector2(-_apo - ARM_LEN,  hw),
+		],
 	}
-	# Para E y W el rect es horizontal — corrijo los puntos para que sean rect bien formado:
-	arm_polygons["E"] = [
-		Vector2(right_mid.x, right_mid.y - ARM_W * 0.5),
-		Vector2(right_mid.x + ARM_LEN, right_mid.y - ARM_W * 0.5),
-		Vector2(right_mid.x + ARM_LEN, right_mid.y + ARM_W * 0.5),
-		Vector2(right_mid.x, right_mid.y + ARM_W * 0.5),
-	]
-	arm_polygons["W"] = [
-		Vector2(left_mid.x - ARM_LEN, left_mid.y - ARM_W * 0.5),
-		Vector2(left_mid.x, left_mid.y - ARM_W * 0.5),
-		Vector2(left_mid.x, left_mid.y + ARM_W * 0.5),
-		Vector2(left_mid.x - ARM_LEN, left_mid.y + ARM_W * 0.5),
-	]
 
-	# Puertas — al final de cada brazo, un poco hacia adentro
 	door_centers = {
-		"N": Vector2(top_mid.x, top_mid.y - ARM_LEN + 8.0),
-		"E": Vector2(right_mid.x + ARM_LEN - 8.0, right_mid.y),
-		"W": Vector2(left_mid.x - ARM_LEN + 8.0, left_mid.y),
+		"N": c + Vector2(0.0,                    -_apo - ARM_LEN + 10.0),
+		"E": c + Vector2(_apo + ARM_LEN - 10.0,   0.0),
+		"W": c + Vector2(-_apo - ARM_LEN + 10.0,  0.0),
 	}
 
-	# Plataformas (60×60) en los vértices NW, NE, SW, SE (ajustadas hacia afuera del hex)
-	# V5 = arriba-derecha (NE), V4 = arriba-izquierda (NW), V1 = abajo-derecha (SE), V2 = abajo-izquierda (SW)
-	platform_polygons = [
-		Rect2(hex_vertices[4] - Vector2(PLAT_SIZE * 0.5, PLAT_SIZE * 0.5), Vector2(PLAT_SIZE, PLAT_SIZE)),  # NW
-		Rect2(hex_vertices[5] - Vector2(PLAT_SIZE * 0.5, PLAT_SIZE * 0.5), Vector2(PLAT_SIZE, PLAT_SIZE)),  # NE
-		Rect2(hex_vertices[2] - Vector2(PLAT_SIZE * 0.5, PLAT_SIZE * 0.5), Vector2(PLAT_SIZE, PLAT_SIZE)),  # SW
-		Rect2(hex_vertices[1] - Vector2(PLAT_SIZE * 0.5, PLAT_SIZE * 0.5), Vector2(PLAT_SIZE, PLAT_SIZE)),  # SE
-	]
-
-	# Muralla sur — debajo del hex, sin entrada
 	south_wall_rect = Rect2(
-		Vector2(hex_center.x - SOUTH_W * 0.5, bottom_mid.y + 5.0),
+		c + Vector2(-SOUTH_W * 0.5, _apo),
 		Vector2(SOUTH_W, SOUTH_H))
 
-	# Torre central — sobre la muralla sur
+	# Tower sits visually above the south wall (lower Y = higher on screen)
 	tower_l2_rect = Rect2(
-		Vector2(hex_center.x - TOWER_L2_W * 0.5, south_wall_rect.position.y - 12.0),
+		c + Vector2(-TOWER_L2_W * 0.5, _apo - TOWER_L2_H - 6.0),
 		Vector2(TOWER_L2_W, TOWER_L2_H))
 	tower_l3_rect = Rect2(
-		Vector2(hex_center.x - TOWER_L3_W * 0.5, tower_l2_rect.position.y - TOWER_L3_H + 6.0),
+		c + Vector2(-TOWER_L3_W * 0.5, _apo - TOWER_L2_H - TOWER_L3_H - 10.0),
 		Vector2(TOWER_L3_W, TOWER_L3_H))
 
-	# ── Zonas de escalera ──
-	# Cada plataforma tiene una escalera al lado (dirección hacia el hex)
-	# Escalera al lado de NW (a la derecha de la plataforma NW, mirando hacia el hex)
-	for i in 4:
-		var plat_rect: Rect2 = platform_polygons[i]
-		var plat_center := plat_rect.position + plat_rect.size * 0.5
-		var to_hex: Vector2 = (hex_center - plat_center).normalized()
-		var stair_pos: Vector2 = plat_center + to_hex * (PLAT_SIZE * 0.5 + 4.0)
-		var stair_rect := Rect2(
-			stair_pos - Vector2(STAIR_SIZE * 0.5, STAIR_SIZE * 0.5),
-			Vector2(STAIR_SIZE, STAIR_SIZE))
-		stair_zones.append({
-			"rect":       stair_rect,
-			"from_level": 0,
-			"to_level":   1,
-			"plat_idx":   i,
-		})
+	platform_polygons = []
 
-	# Escalera de la muralla sur (laterales)
+	# ── Stair zones ──
+	stair_zones = []
 	stair_zones.append({
 		"rect": Rect2(south_wall_rect.position - Vector2(STAIR_SIZE + 2.0, 0),
 			Vector2(STAIR_SIZE, south_wall_rect.size.y)),
@@ -219,101 +172,76 @@ func _build_geometry() -> void:
 			Vector2(STAIR_SIZE, south_wall_rect.size.y)),
 		"from_level": 0, "to_level": 1, "plat_idx": -1
 	})
-
-	# Escalera muralla → torre L2 (centro de la muralla sur sube a torre L2)
 	stair_zones.append({
-		"rect": Rect2(
-			Vector2(hex_center.x - 8.0, south_wall_rect.position.y - 4.0),
-			Vector2(16.0, 22.0)),
+		"rect": Rect2(c + Vector2(-10.0, _apo - 6.0), Vector2(20.0, 20.0)),
 		"from_level": 1, "to_level": 2, "plat_idx": -2
 	})
-
-	# Escalera torre L2 → L3 (parte superior de la torre L2)
 	stair_zones.append({
-		"rect": Rect2(
-			Vector2(hex_center.x - 8.0, tower_l2_rect.position.y - 6.0),
-			Vector2(16.0, 22.0)),
+		"rect": Rect2(c + Vector2(-10.0, _apo - TOWER_L2_H - 10.0), Vector2(20.0, 20.0)),
 		"from_level": 2, "to_level": 3, "plat_idx": -3
 	})
 
-	# ── Slots de estaciones (dentro del hexágono) ──
-	# Posicionados arriba (taller), izquierda (generador), abajo (enfermería)
-	var taller := Slot.new()
-	taller.pos    = hex_center + Vector2(-35.0, -55.0)
-	taller.size   = Vector2(50.0, 36.0)
-	taller.stype  = StationType.TALLER
-	taller.color  = Color(0.80, 0.45, 0.20)
-	taller.label  = "TALLER"
+	# ── Station slots ──
+	slots = []
+	var taller     := Slot.new()
+	taller.pos      = c + Vector2(-38.0, -50.0)
+	taller.size     = Vector2(50.0, 36.0)
+	taller.stype    = StationType.TALLER
+	taller.color    = Color(0.80, 0.45, 0.20)
+	taller.label    = "TALLER"
 	slots.append(taller)
 
-	var generator := Slot.new()
-	generator.pos    = hex_center + Vector2(35.0, -55.0)
-	generator.size   = Vector2(50.0, 36.0)
-	generator.stype  = StationType.GENERATOR
-	generator.color  = Color(0.0, 0.83, 1.0)
-	generator.label  = "GENER."
+	var generator  := Slot.new()
+	generator.pos   = c + Vector2(38.0, -50.0)
+	generator.size  = Vector2(50.0, 36.0)
+	generator.stype = StationType.GENERATOR
+	generator.color = Color(0.0, 0.83, 1.0)
+	generator.label = "GENER."
 	slots.append(generator)
 
 	var enfermeria := Slot.new()
-	enfermeria.pos    = hex_center + Vector2(0.0, 55.0)
-	enfermeria.size   = Vector2(50.0, 36.0)
-	enfermeria.stype  = StationType.ENFERMERIA
-	enfermeria.color  = Color(0.22, 1.0, 0.30)
-	enfermeria.label  = "ENFERM."
+	enfermeria.pos   = c + Vector2(0.0, 50.0)
+	enfermeria.size  = Vector2(50.0, 36.0)
+	enfermeria.stype = StationType.ENFERMERIA
+	enfermeria.color = Color(0.22, 1.0, 0.30)
+	enfermeria.label = "ENFERM."
 	slots.append(enfermeria)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Colisión física (paredes de brazos y muralla sur)
-# Layer 8 = Layer 4 — misma capa que muros/torretas; bloquea enemigos y player
+# Collision
 # ─────────────────────────────────────────────────────────────────────────────
 
 func _build_collision() -> void:
-	const T      := 8.0
-	const SQRT32 := 0.866025
-	var   hy     := HEX_RADIUS * SQRT32
+	var hw := ARM_W * 0.5
+	const T := 8.0
 
-	# [center_local, size]  — todo en espacio LOCAL del nodo (0,0 = centro fortress)
-	var walls: Array = [
-		# Brazo N — paredes laterales izquierda y derecha
-		[Vector2(-ARM_W * 0.5, -(hy + ARM_LEN * 0.5)), Vector2(T, ARM_LEN)],
-		[Vector2( ARM_W * 0.5, -(hy + ARM_LEN * 0.5)), Vector2(T, ARM_LEN)],
-		# Brazo E — paredes superior e inferior
-		[Vector2(HEX_RADIUS + ARM_LEN * 0.5, -ARM_W * 0.5), Vector2(ARM_LEN, T)],
-		[Vector2(HEX_RADIUS + ARM_LEN * 0.5,  ARM_W * 0.5), Vector2(ARM_LEN, T)],
-		# Brazo W — paredes superior e inferior
-		[Vector2(-(HEX_RADIUS + ARM_LEN * 0.5), -ARM_W * 0.5), Vector2(ARM_LEN, T)],
-		[Vector2(-(HEX_RADIUS + ARM_LEN * 0.5),  ARM_W * 0.5), Vector2(ARM_LEN, T)],
-		# Muralla Sur — pared sólida (no hay puerta)
-		[Vector2(0.0, hy + SOUTH_H * 0.5), Vector2(SOUTH_W, SOUTH_H)],
-	]
+	_fort_walls = []
+	# N arm left and right walls
+	_add_fort_wall(Vector2(-hw,  -_apo - ARM_LEN * 0.5), Vector2(T, ARM_LEN))
+	_add_fort_wall(Vector2( hw,  -_apo - ARM_LEN * 0.5), Vector2(T, ARM_LEN))
+	# E arm top and bottom walls
+	_add_fort_wall(Vector2(_apo + ARM_LEN * 0.5, -hw),   Vector2(ARM_LEN, T))
+	_add_fort_wall(Vector2(_apo + ARM_LEN * 0.5,  hw),   Vector2(ARM_LEN, T))
+	# W arm top and bottom walls
+	_add_fort_wall(Vector2(-_apo - ARM_LEN * 0.5, -hw),  Vector2(ARM_LEN, T))
+	_add_fort_wall(Vector2(-_apo - ARM_LEN * 0.5,  hw),  Vector2(ARM_LEN, T))
+	# South wall (solid face)
+	_add_fort_wall(Vector2(0.0, _apo + SOUTH_H * 0.5),   Vector2(SOUTH_W, SOUTH_H))
 
-	for w in walls:
-		var sb    := StaticBody2D.new()
-		sb.collision_layer = 8
-		sb.collision_mask  = 0
-		var cs    := CollisionShape2D.new()
-		var rect  := RectangleShape2D.new()
-		rect.size  = w[1]
-		cs.position = w[0]
-		cs.shape    = rect
-		sb.add_child(cs)
-		add_child(sb)
+	# Corner gap-fillers (regular static bodies)
+	_add_wall_seg(Vector2( hw,              -_apo),  Vector2( _apo,              -hw))  # NE
+	_add_wall_seg(Vector2(-_apo,            -hw),    Vector2(-hw,               -_apo)) # NW
+	_add_wall_seg(Vector2( _apo,             hw),    Vector2( SOUTH_W * 0.5,    _apo))  # SE
+	_add_wall_seg(Vector2(-SOUTH_W * 0.5,   _apo),  Vector2(-_apo,              hw))   # SW
 
-	# ── Perímetro diagonal del hexágono ──────────────────────────────────────
-	# Sin estas paredes el jugador se escapa por las esquinas entre brazos.
-	# hx = radio horizontal de vértice (100), hw = semi-ancho de brazo (55)
-	var hx := HEX_RADIUS * 0.5   # 100
-	var hw := ARM_W * 0.5         # 55
-	# Top side: gaps entre vértice NW/NE y apertura del brazo N
-	_add_wall_seg(Vector2(-hx, -hy), Vector2(-hw, -hy))  # NW → N-arm izq
-	_add_wall_seg(Vector2( hw, -hy), Vector2( hx, -hy))  # N-arm der → NE
-	# Diagonales NE y SE (lado derecho del hex)
-	_add_wall_seg(Vector2( hx, -hy), Vector2( HEX_RADIUS, -hw))  # NE diagonal
-	_add_wall_seg(Vector2( HEX_RADIUS,  hw), Vector2( hx,  hy))  # SE diagonal
-	# Diagonales SW y NW (lado izquierdo del hex)
-	_add_wall_seg(Vector2(-hx,  hy), Vector2(-HEX_RADIUS,  hw))  # SW diagonal
-	_add_wall_seg(Vector2(-HEX_RADIUS, -hw), Vector2(-hx, -hy))  # NW diagonal
+
+func _add_fort_wall(local_center: Vector2, wall_size: Vector2) -> void:
+	var fw := FortWall.new()
+	fw.position = local_center
+	fw.init_wall(wall_size)
+	_fort_walls.append(fw)
+	add_child(fw)
 
 
 func _add_wall_seg(from_pt: Vector2, to_pt: Vector2) -> void:
@@ -332,503 +260,410 @@ func _add_wall_seg(from_pt: Vector2, to_pt: Vector2) -> void:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Dibujado
+# Drawing
 # ─────────────────────────────────────────────────────────────────────────────
 
 func _draw() -> void:
-	# Las coords son globales; convertimos a locales restando global_position
-	var c := -global_position + hex_center
+	var c := -global_position + hex_center  # == Vector2.ZERO
 
-	# 1) BRAZOS (piso 0) — dibujar primero para que queden detrás del hex
+	# 1) Arms (floor 0) — drawn first so octagon overlaps
 	for k in arm_polygons:
 		var poly: Array = arm_polygons[k]
-		var local_poly := PackedVector2Array()
+		var lp := PackedVector2Array()
 		for v in poly:
-			local_poly.append(v - global_position)
-		draw_colored_polygon(local_poly, COL_FLOOR_0)
-		draw_polyline(local_poly + PackedVector2Array([local_poly[0]]),
-			COL_FLOOR_0_EDGE, 1.5)
+			lp.append(v - global_position)
+		draw_colored_polygon(lp, COL_FLOOR_0)
+		draw_polyline(lp + PackedVector2Array([lp[0]]), COL_FLOOR_0_EDGE, 1.5)
 
-	# 2) MURALLA SUR (piso 1) con sombra simulada
-	var sw_local := Rect2(south_wall_rect.position - global_position, south_wall_rect.size)
-	# Sombra
-	draw_rect(Rect2(sw_local.position + Vector2(0, 4), sw_local.size),
-		Color(0, 0, 0, 0.5))
-	# Cuerpo
-	draw_rect(sw_local, COL_FLOOR_1)
-	draw_rect(sw_local, COL_FLOOR_1_EDGE, false, 2.0)
-	# Detalles
-	draw_line(sw_local.position + Vector2(0, 8),
-		sw_local.position + Vector2(sw_local.size.x, 8),
-		COL_FLOOR_1_EDGE, 0.8)
-	draw_line(sw_local.position + Vector2(0, sw_local.size.y - 4),
-		sw_local.position + Vector2(sw_local.size.x, sw_local.size.y - 4),
-		COL_FLOOR_1_EDGE, 0.8)
+	# 2) South wall (floor 1)
+	var sw := Rect2(south_wall_rect.position - global_position, south_wall_rect.size)
+	draw_rect(Rect2(sw.position + Vector2(0, 4), sw.size), Color(0, 0, 0, 0.5))
+	draw_rect(sw, COL_FLOOR_1)
+	draw_rect(sw, COL_FLOOR_1_EDGE, false, 2.0)
+	draw_line(sw.position + Vector2(0, 8),
+		sw.position + Vector2(sw.size.x, 8), COL_FLOOR_1_EDGE, 0.8)
+	var hazard := Color(0.72, 0.55, 0.0, 0.55)
+	for si in 6:
+		var sx: float = sw.position.x + 6.0 + si * 30.0
+		if sx + 14.0 > sw.position.x + sw.size.x - 6.0:
+			break
+		if si % 2 == 0:
+			var sp := PackedVector2Array([
+				Vector2(sx,        sw.position.y + 6),
+				Vector2(sx + 14.0, sw.position.y + 6),
+				Vector2(sx + 10.0, sw.position.y + sw.size.y - 6),
+				Vector2(sx - 4.0,  sw.position.y + sw.size.y - 6),
+			])
+			draw_colored_polygon(sp, hazard)
 
-	# 3) HEXÁGONO CENTRAL (piso 0)
-	var hex_local := PackedVector2Array()
+	# 3) Octagon central body
+	var oct := PackedVector2Array()
 	for v in hex_vertices:
-		hex_local.append(v - global_position)
-	draw_colored_polygon(hex_local, COL_FLOOR_0)
-	draw_polyline(hex_local + PackedVector2Array([hex_local[0]]),
-		COL_FLOOR_0_EDGE, 2.0)
-	# Líneas decorativas internas
-	draw_line(c + Vector2(-HEX_RADIUS * 0.7, 0), c + Vector2(HEX_RADIUS * 0.7, 0),
-		Color(0.20, 0.26, 0.34, 0.4), 0.8)
-	draw_line(c + Vector2(0, -HEX_RADIUS * 0.7), c + Vector2(0, HEX_RADIUS * 0.7),
-		Color(0.20, 0.26, 0.34, 0.4), 0.8)
+		oct.append(v - global_position)
+	draw_colored_polygon(oct, COL_FLOOR_0)
+	draw_polyline(oct + PackedVector2Array([oct[0]]), COL_FLOOR_0_EDGE, 2.0)
+	draw_line(c + Vector2(-OCT_RADIUS * 0.7, 0), c + Vector2(OCT_RADIUS * 0.7, 0),
+		Color(0.20, 0.26, 0.34, 0.35), 0.8)
+	draw_line(c + Vector2(0, -OCT_RADIUS * 0.7), c + Vector2(0, OCT_RADIUS * 0.7),
+		Color(0.20, 0.26, 0.34, 0.35), 0.8)
 
-	# 4) MUROS DE LOS BRAZOS (líneas laterales con apertura para puerta)
+	# 4) Arm wall lines
 	_draw_arm_walls()
 
-	# 5) PUERTAS — líneas amarillas y luces ámbar
+	# 5) Gates
 	_draw_gates()
 
-	# 6) PLATAFORMAS de torreta (4 esquinas) - piso 1 con sombra
-	for plat_rect in platform_polygons:
-		var pr_local := Rect2(plat_rect.position - global_position, plat_rect.size)
-		# Sombra
-		draw_rect(Rect2(pr_local.position + Vector2(0, 3), pr_local.size),
-			Color(0, 0, 0, 0.4))
-		# Cuerpo
-		draw_rect(pr_local, COL_PLATFORM)
-		draw_rect(pr_local, COL_FLOOR_1_EDGE, false, 2.0)
-		# Tornillos en las 4 esquinas
-		var corners := [
-			pr_local.position + Vector2(4, 4),
-			pr_local.position + Vector2(pr_local.size.x - 4, 4),
-			pr_local.position + Vector2(4, pr_local.size.y - 4),
-			pr_local.position + Vector2(pr_local.size.x - 4, pr_local.size.y - 4),
-		]
-		for cp in corners:
-			draw_circle(cp, 1.5, Color(0.36, 0.45, 0.55))
-		# Marker ⊕
-		var pc := pr_local.position + pr_local.size * 0.5
-		draw_circle(pc, 5.0, Color(0, 0, 0, 0))
-		draw_arc(pc, 5.0, 0, TAU, 12, Color(0.40, 0.55, 0.70, 0.6), 1.0)
-		draw_line(pc + Vector2(-7, 0), pc + Vector2(7, 0),
-			Color(0.40, 0.55, 0.70, 0.5), 1.0)
-		draw_line(pc + Vector2(0, -7), pc + Vector2(0, 7),
-			Color(0.40, 0.55, 0.70, 0.5), 1.0)
-
-	# 7) ESCALERAS
-	_draw_stairs()
-
-	# 8) TORRE CENTRAL (L2 + L3) con sombras escalonadas
+	# 6) Tower
 	_draw_tower()
 
-	# 9) SLOTS DE ESTACIONES (dibujadas si built, silueta punteada si no)
+	# 7) Stairs
+	_draw_stairs()
+
+	# 8) Station slots
 	for slot in slots:
 		_draw_slot(slot)
 
-	# 10) NÚCLEO en el centro
+	# 9) Core
 	_draw_core(c)
 
-	# 11) Antenas con LED rojo en plataformas y torre
+	# 10) Antenna
 	_draw_antennas()
 
-	# 12) Detalles de búnker humano repropuesto
+	# 11) Bunker details
 	_draw_bunker_details(c)
+
+	# 12) Wall damage overlay
+	_draw_wall_damage()
 
 
 func _draw_arm_walls() -> void:
-	# Brazo N — paredes verticales (laterales) con apertura al final (la puerta)
+	var gp := global_position
+
 	var arm_n: Array = arm_polygons["N"]
-	var top_l_local: Vector2 = arm_n[1] - global_position
-	var top_r_local: Vector2 = arm_n[2] - global_position
-	var bot_l_local: Vector2 = arm_n[0] - global_position
-	var bot_r_local: Vector2 = arm_n[3] - global_position
-	# Pared izquierda completa (de arriba a la base del brazo)
-	draw_line(top_l_local, bot_l_local, COL_WALL_EDGE, 4.0)
-	# Pared derecha completa
-	draw_line(top_r_local, bot_r_local, COL_WALL_EDGE, 4.0)
-	# Esquinas del extremo (parte de la puerta — tope superior tiene "marco" de muro a los lados)
-	draw_line(top_l_local, top_l_local + Vector2(8, 0), COL_WALL_EDGE, 4.0)
-	draw_line(top_r_local, top_r_local + Vector2(-8, 0), COL_WALL_EDGE, 4.0)
+	var n_bl := arm_n[0] - gp
+	var n_tl := arm_n[1] - gp
+	var n_tr := arm_n[2] - gp
+	var n_br := arm_n[3] - gp
+	draw_line(n_tl, n_bl, COL_WALL_EDGE, 4.0)
+	draw_line(n_tr, n_br, COL_WALL_EDGE, 4.0)
+	draw_line(n_tl, n_tl + Vector2(8,  0),  COL_WALL_EDGE, 4.0)
+	draw_line(n_tr, n_tr + Vector2(-8, 0),  COL_WALL_EDGE, 4.0)
 
-	# Brazo E
 	var arm_e: Array = arm_polygons["E"]
-	# arm_e[0] = top-left, [1] = top-right, [2] = bottom-right, [3] = bottom-left
-	var e_tl: Vector2 = arm_e[0] - global_position
-	var e_tr: Vector2 = arm_e[1] - global_position
-	var e_br: Vector2 = arm_e[2] - global_position
-	var e_bl: Vector2 = arm_e[3] - global_position
-	# Pared superior
+	var e_tl := arm_e[0] - gp
+	var e_tr := arm_e[1] - gp
+	var e_br := arm_e[2] - gp
+	var e_bl := arm_e[3] - gp
 	draw_line(e_tl, e_tr, COL_WALL_EDGE, 4.0)
-	# Pared inferior
 	draw_line(e_bl, e_br, COL_WALL_EDGE, 4.0)
-	# Marco de la puerta
-	draw_line(e_tr, e_tr + Vector2(0, 8), COL_WALL_EDGE, 4.0)
-	draw_line(e_br, e_br + Vector2(0, -8), COL_WALL_EDGE, 4.0)
+	draw_line(e_tr, e_tr + Vector2(0,  8),  COL_WALL_EDGE, 4.0)
+	draw_line(e_br, e_br + Vector2(0, -8),  COL_WALL_EDGE, 4.0)
 
-	# Brazo W
 	var arm_w: Array = arm_polygons["W"]
-	var w_tl: Vector2 = arm_w[0] - global_position
-	var w_tr: Vector2 = arm_w[1] - global_position
-	var w_br: Vector2 = arm_w[2] - global_position
-	var w_bl: Vector2 = arm_w[3] - global_position
+	var w_tl := arm_w[0] - gp
+	var w_tr := arm_w[1] - gp
+	var w_br := arm_w[2] - gp
+	var w_bl := arm_w[3] - gp
 	draw_line(w_tl, w_tr, COL_WALL_EDGE, 4.0)
 	draw_line(w_bl, w_br, COL_WALL_EDGE, 4.0)
-	draw_line(w_tl, w_tl + Vector2(0, 8), COL_WALL_EDGE, 4.0)
-	draw_line(w_bl, w_bl + Vector2(0, -8), COL_WALL_EDGE, 4.0)
+	draw_line(w_tl, w_tl + Vector2(0,  8),  COL_WALL_EDGE, 4.0)
+	draw_line(w_bl, w_bl + Vector2(0, -8),  COL_WALL_EDGE, 4.0)
 
 
 func _draw_gates() -> void:
 	var pulse: float = 0.6 + 0.4 * (sin(_pulse_t * 4.0) * 0.5 + 0.5)
+	var gp := global_position
 
-	# Gate N — línea horizontal amarilla al final del brazo (arriba)
-	var gn: Vector2 = door_centers["N"] - global_position
-	draw_line(gn + Vector2(-30, 0), gn + Vector2(30, 0),
-		COL_GATE_LINE, 2.5)
-	draw_circle(gn + Vector2(-34, 0), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
-	draw_circle(gn + Vector2(34, 0), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
+	var gn: Vector2 = door_centers["N"] - gp
+	draw_line(gn + Vector2(-28, 0), gn + Vector2(28, 0), COL_GATE_LINE, 2.5)
+	draw_circle(gn + Vector2(-32, 0), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
+	draw_circle(gn + Vector2( 32, 0), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
 
-	# Gate E — vertical
-	var ge: Vector2 = door_centers["E"] - global_position
-	draw_line(ge + Vector2(0, -30), ge + Vector2(0, 30),
-		COL_GATE_LINE, 2.5)
-	draw_circle(ge + Vector2(0, -34), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
-	draw_circle(ge + Vector2(0, 34), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
+	var ge: Vector2 = door_centers["E"] - gp
+	draw_line(ge + Vector2(0, -28), ge + Vector2(0, 28), COL_GATE_LINE, 2.5)
+	draw_circle(ge + Vector2(0, -32), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
+	draw_circle(ge + Vector2(0,  32), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
 
-	# Gate W
-	var gw: Vector2 = door_centers["W"] - global_position
-	draw_line(gw + Vector2(0, -30), gw + Vector2(0, 30),
-		COL_GATE_LINE, 2.5)
-	draw_circle(gw + Vector2(0, -34), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
-	draw_circle(gw + Vector2(0, 34), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
+	var gw: Vector2 = door_centers["W"] - gp
+	draw_line(gw + Vector2(0, -28), gw + Vector2(0, 28), COL_GATE_LINE, 2.5)
+	draw_circle(gw + Vector2(0, -32), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
+	draw_circle(gw + Vector2(0,  32), 3.0, COL_AMBER * Color(1, 1, 1, pulse))
 
 
 func _draw_stairs() -> void:
 	for sz in stair_zones:
 		var sr: Rect2 = sz["rect"]
-		var sr_local := Rect2(sr.position - global_position, sr.size)
-		draw_rect(sr_local, COL_STAIR)
-		draw_rect(sr_local, COL_STAIR_EDGE, false, 1.0)
-		# Líneas de "escalones"
-		var rows := 3
-		for i in rows:
-			var y: float = sr_local.position.y + sr_local.size.y * (float(i + 1) / float(rows + 1))
-			draw_line(Vector2(sr_local.position.x + 2, y),
-				Vector2(sr_local.position.x + sr_local.size.x - 2, y),
+		var sl := Rect2(sr.position - global_position, sr.size)
+		draw_rect(sl, COL_STAIR)
+		draw_rect(sl, COL_STAIR_EDGE, false, 1.0)
+		for i in 3:
+			var y: float = sl.position.y + sl.size.y * (float(i + 1) / 4.0)
+			draw_line(Vector2(sl.position.x + 2, y),
+				Vector2(sl.position.x + sl.size.x - 2, y),
 				COL_STAIR_EDGE * Color(1, 1, 1, 0.55), 0.7)
 
 
 func _draw_tower() -> void:
-	# Sombra del L2 (fuerte)
-	var l2_local := Rect2(tower_l2_rect.position - global_position, tower_l2_rect.size)
-	draw_rect(Rect2(l2_local.position + Vector2(0, 5), l2_local.size),
-		Color(0, 0, 0, 0.55))
-	# Cuerpo L2
-	draw_rect(l2_local, COL_FLOOR_2)
-	draw_rect(l2_local, COL_FLOOR_2_EDGE, false, 2.0)
-	# Texto "TORRE 2do piso"
-	var l2_center := l2_local.position + l2_local.size * 0.5
-	draw_string(ThemeDB.fallback_font, l2_center + Vector2(-22, -2), "TORRE",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, COL_FLOOR_2_EDGE)
+	var l2 := Rect2(tower_l2_rect.position - global_position, tower_l2_rect.size)
+	draw_rect(Rect2(l2.position + Vector2(0, 5), l2.size), Color(0, 0, 0, 0.55))
+	draw_rect(l2, COL_FLOOR_2)
+	draw_rect(l2, COL_FLOOR_2_EDGE, false, 2.0)
+	draw_string(ThemeDB.fallback_font, l2.position + l2.size * 0.5 + Vector2(-20, 4),
+		"TORRE", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, COL_FLOOR_2_EDGE)
 
-	# Sombra del L3 (más fuerte)
-	var l3_local := Rect2(tower_l3_rect.position - global_position, tower_l3_rect.size)
-	draw_rect(Rect2(l3_local.position + Vector2(0, 7), l3_local.size),
-		Color(0, 0, 0, 0.65))
-	# Cuerpo L3
-	draw_rect(l3_local, COL_TOWER)
-	draw_rect(l3_local, COL_TOWER_EDGE, false, 2.5)
-	# Almenas en el techo
-	var almena_w := 7.0
-	var almena_h := 6.0
-	var almena_y: float = l3_local.position.y - almena_h
-	for i in 6:
-		var almena_x: float = l3_local.position.x + 4.0 + i * 10.0
-		draw_rect(Rect2(Vector2(almena_x, almena_y),
-			Vector2(almena_w, almena_h)), COL_TOWER)
-		draw_rect(Rect2(Vector2(almena_x, almena_y),
-			Vector2(almena_w, almena_h)), COL_TOWER_EDGE, false, 1.0)
-	# Línea brillante superior
-	draw_rect(Rect2(l3_local.position, Vector2(l3_local.size.x, 4.0)),
+	var l3 := Rect2(tower_l3_rect.position - global_position, tower_l3_rect.size)
+	draw_rect(Rect2(l3.position + Vector2(0, 7), l3.size), Color(0, 0, 0, 0.65))
+	draw_rect(l3, COL_TOWER)
+	draw_rect(l3, COL_TOWER_EDGE, false, 2.5)
+	var alm_y: float = l3.position.y - 6.0
+	for i in 5:
+		var alm_x: float = l3.position.x + 4.0 + float(i) * 13.0
+		draw_rect(Rect2(Vector2(alm_x, alm_y), Vector2(7.0, 6.0)), COL_TOWER)
+		draw_rect(Rect2(Vector2(alm_x, alm_y), Vector2(7.0, 6.0)), COL_TOWER_EDGE, false, 1.0)
+	draw_rect(Rect2(l3.position, Vector2(l3.size.x, 4.0)),
 		COL_TOWER_EDGE * Color(0.7, 0.85, 1.0, 1.0))
 
 
 func _draw_slot(slot: Slot) -> void:
-	var rect_local := Rect2(slot.pos - global_position - slot.size * 0.5, slot.size)
+	var rl := Rect2(slot.pos - global_position - slot.size * 0.5, slot.size)
 	if slot.built:
-		# Estación construida con color sólido
-		draw_rect(rect_local, slot.color * Color(0.25, 0.25, 0.25, 0.95))
-		draw_rect(rect_local, slot.color, false, 1.5)
-		# Banner color en la parte superior
-		draw_rect(Rect2(rect_local.position, Vector2(rect_local.size.x, 6.0)),
-			slot.color)
-		# Label
+		draw_rect(rl, slot.color * Color(0.25, 0.25, 0.25, 0.95))
+		draw_rect(rl, slot.color, false, 1.5)
+		draw_rect(Rect2(rl.position, Vector2(rl.size.x, 6.0)), slot.color)
 		draw_string(ThemeDB.fallback_font,
-			rect_local.position + Vector2(rect_local.size.x * 0.5 - 22, 18),
+			rl.position + Vector2(rl.size.x * 0.5 - 22, 18),
 			slot.label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, slot.color * Color(1.4, 1.4, 1.4))
-		# HP bar si está dañada
 		if slot.hp < slot.max_hp:
-			var bar_w: float = rect_local.size.x - 6
-			var bar_x: float = rect_local.position.x + 3
-			var bar_y: float = rect_local.position.y + rect_local.size.y - 5
-			draw_rect(Rect2(Vector2(bar_x, bar_y), Vector2(bar_w, 3)),
-				Color(0.10, 0.0, 0.0, 0.85))
-			var fill: float = bar_w * float(slot.hp) / float(slot.max_hp)
-			draw_rect(Rect2(Vector2(bar_x, bar_y), Vector2(fill, 3)),
+			var bw := rl.size.x - 6.0
+			var bx := rl.position.x + 3.0
+			var by := rl.position.y + rl.size.y - 5.0
+			draw_rect(Rect2(Vector2(bx, by), Vector2(bw, 3)), Color(0.10, 0.0, 0.0, 0.85))
+			draw_rect(Rect2(Vector2(bx, by),
+				Vector2(bw * float(slot.hp) / float(slot.max_hp), 3)),
 				Color(0.95, 0.20, 0.15))
 	else:
-		# Silueta punteada (proyecto)
-		var dashed_color := slot.color * Color(1, 1, 1, 0.45)
-		_draw_dashed_rect(rect_local, dashed_color, 4.0, 3.0)
+		var dc := slot.color * Color(1, 1, 1, 0.45)
+		_draw_dashed_rect(rl, dc, 4.0, 3.0)
 		draw_string(ThemeDB.fallback_font,
-			rect_local.position + Vector2(rect_local.size.x * 0.5 - 18, 16),
-			slot.label, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, dashed_color)
+			rl.position + Vector2(rl.size.x * 0.5 - 18, 16),
+			slot.label, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, dc)
 		draw_string(ThemeDB.fallback_font,
-			rect_local.position + Vector2(rect_local.size.x * 0.5 - 14, 28),
-			"[20 ⚙]", HORIZONTAL_ALIGNMENT_LEFT, -1, 7, dashed_color)
+			rl.position + Vector2(rl.size.x * 0.5 - 14, 28),
+			"[20 ⚙]", HORIZONTAL_ALIGNMENT_LEFT, -1, 7, dc)
 
 
 func _draw_dashed_rect(r: Rect2, color: Color, dash: float, gap: float) -> void:
-	var perim := [
-		[r.position, r.position + Vector2(r.size.x, 0)],
-		[r.position + Vector2(r.size.x, 0), r.position + r.size],
-		[r.position + r.size, r.position + Vector2(0, r.size.y)],
-		[r.position + Vector2(0, r.size.y), r.position],
+	var segs := [
+		[r.position,                            r.position + Vector2(r.size.x, 0)],
+		[r.position + Vector2(r.size.x, 0),     r.position + r.size],
+		[r.position + r.size,                   r.position + Vector2(0, r.size.y)],
+		[r.position + Vector2(0, r.size.y),     r.position],
 	]
-	for seg in perim:
+	for seg in segs:
 		var a: Vector2 = seg[0]
 		var b: Vector2 = seg[1]
 		var dist: float = a.distance_to(b)
 		var dir: Vector2 = (b - a).normalized()
 		var t: float = 0.0
 		while t < dist:
-			var seg_end: float = minf(t + dash, dist)
-			draw_line(a + dir * t, a + dir * seg_end, color, 1.2)
+			draw_line(a + dir * t, a + dir * minf(t + dash, dist), color, 1.2)
 			t += dash + gap
 
 
 func _draw_core(c: Vector2) -> void:
 	var pulse: float = 0.85 + 0.15 * sin(_pulse_t * 3.0)
-	# Plataforma octogonal
 	var oct: PackedVector2Array = PackedVector2Array()
 	for i in 8:
-		var a: float = deg_to_rad(22.5 + i * 45.0)
-		oct.append(c + Vector2(cos(a), sin(a)) * 30.0)
+		var a: float = deg_to_rad(22.5 + float(i) * 45.0)
+		oct.append(c + Vector2(cos(a), sin(a)) * 28.0)
 	draw_colored_polygon(oct, Color(0.04, 0.10, 0.16))
 	draw_polyline(oct + PackedVector2Array([oct[0]]), COL_CORE_OUTER, 2.0)
-	# Esfera del núcleo
 	draw_circle(c, CORE_R, COL_CORE_OUTER * Color(pulse, pulse, pulse, 1.0))
 	draw_circle(c, CORE_R * 0.55, COL_CORE_INNER * Color(1, 1, 1, 0.85))
 	draw_circle(c, CORE_R * 0.25, Color(1, 1, 1, 0.85))
-	# Anillo rotatorio
 	var ring_r := CORE_R + 6.0
-	var ring_segments := 16
-	for i in ring_segments:
-		var a0: float = (TAU / ring_segments) * i + _pulse_t * 0.6
-		var a1: float = a0 + (TAU / ring_segments) * 0.5
+	for i in 16:
+		var a0: float = (TAU / 16.0) * float(i) + _pulse_t * 0.6
+		var a1: float = a0 + (TAU / 32.0)
 		draw_arc(c, ring_r, a0, a1, 6, COL_CORE_OUTER * Color(1, 1, 1, 0.7), 1.0)
 
 
 func _draw_antennas() -> void:
-	var pulse_red: float = 0.5 + 0.5 * sin(_pulse_t * 5.0)
-	# Antenas en plataformas
-	for plat_rect in platform_polygons:
-		var top_local: Vector2 = plat_rect.position - global_position + Vector2(plat_rect.size.x * 0.5, 0)
-		draw_line(top_local, top_local + Vector2(0, -10),
-			Color(0.36, 0.41, 0.47), 1.2)
-		draw_circle(top_local + Vector2(0, -12), 2.0,
-			Color(1.0, 0.22, 0.22, pulse_red))
-
-	# Antena en la torre
-	var tower_top: Vector2 = tower_l3_rect.position - global_position + Vector2(tower_l3_rect.size.x * 0.5, -6.0)
-	draw_line(tower_top, tower_top + Vector2(0, -22),
-		Color(0.36, 0.41, 0.47), 1.5)
-	draw_circle(tower_top + Vector2(0, -24), 2.5,
-		Color(1.0, 0.22, 0.22, pulse_red))
+	var pr: float = 0.5 + 0.5 * sin(_pulse_t * 5.0)
+	var tt: Vector2 = tower_l3_rect.position - global_position \
+		+ Vector2(tower_l3_rect.size.x * 0.5, -6.0)
+	draw_line(tt, tt + Vector2(0, -20), Color(0.36, 0.41, 0.47), 1.5)
+	draw_circle(tt + Vector2(0, -22), 2.5, Color(1.0, 0.22, 0.22, pr))
 
 
 func _draw_bunker_details(c: Vector2) -> void:
-	var sand   := Color(0.45, 0.38, 0.24)
-	var sand_d := Color(0.32, 0.26, 0.16)
-	var metal  := Color(0.30, 0.28, 0.24)
+	var sand    := Color(0.45, 0.38, 0.24)
+	var sand_d  := Color(0.32, 0.26, 0.16)
+	var metal   := Color(0.30, 0.28, 0.24)
 	var metal_hi := Color(0.50, 0.46, 0.38)
-	var hazard := Color(0.72, 0.55, 0.0, 0.55)
+	var gp      := global_position
 
-	# ── Sacos de arena en cada puerta ──────────────────────────────────────
-	# Puerta N — sacos a ambos lados de la apertura
-	var gn: Vector2 = door_centers["N"] - global_position
-	for s: float in [-1.0, 1.0]:
-		for i in 3:
-			var bx: float = gn.x + s * (36.0 + i * 10.0)
-			draw_circle(Vector2(bx, gn.y - 1),      5.5, sand_d)
-			draw_circle(Vector2(bx, gn.y - 8),      5.0, sand)
-			draw_circle(Vector2(bx + s * 3, gn.y - 4), 4.5, sand_d)
+	# Sandbags at each gate
+	for k in door_centers:
+		var g: Vector2 = door_centers[k] - gp
+		var is_n: bool = (k == "N")
+		for s: float in [-1.0, 1.0]:
+			for i in 3:
+				var off: float = 34.0 + float(i) * 10.0
+				var bp: Vector2 = g + (Vector2(s * off, 0.0) if is_n else Vector2(0.0, s * off))
+				var wobble: Vector2 = Vector2(s * 3.0, 0.0) if is_n else Vector2(0.0, s * 3.0)
+				draw_circle(bp,                  5.5, sand_d)
+				draw_circle(bp + Vector2(0, -6), 5.0, sand)
+				draw_circle(bp + wobble,         4.5, sand_d)
 
-	# Puerta E
-	var ge: Vector2 = door_centers["E"] - global_position
-	for s: float in [-1.0, 1.0]:
-		for i in 3:
-			var by: float = ge.y + s * (36.0 + i * 10.0)
-			draw_circle(Vector2(ge.x + 1, by),      5.5, sand_d)
-			draw_circle(Vector2(ge.x + 8, by),      5.0, sand)
-			draw_circle(Vector2(ge.x + 4, by + s * 3), 4.5, sand_d)
-
-	# Puerta W
-	var gw: Vector2 = door_centers["W"] - global_position
-	for s: float in [-1.0, 1.0]:
-		for i in 3:
-			var by: float = gw.y + s * (36.0 + i * 10.0)
-			draw_circle(Vector2(gw.x - 1, by),      5.5, sand_d)
-			draw_circle(Vector2(gw.x - 8, by),      5.0, sand)
-			draw_circle(Vector2(gw.x - 4, by + s * 3), 4.5, sand_d)
-
-	# ── Generador en el piso del hex ───────────────────────────────────────
-	var gen_c := c + Vector2(55.0, 30.0)
-	# Cuerpo del generador
-	draw_rect(Rect2(gen_c + Vector2(-18, -12), Vector2(36, 24)), Color(0.18, 0.20, 0.16))
-	draw_rect(Rect2(gen_c + Vector2(-18, -12), Vector2(36, 24)), metal_hi, false, 1.5)
-	# Rejilla de ventilación
+	# Generator (right side of octagon)
+	var gc := c + Vector2(50.0, 28.0)
+	draw_rect(Rect2(gc + Vector2(-16, -10), Vector2(32, 22)), Color(0.18, 0.20, 0.16))
+	draw_rect(Rect2(gc + Vector2(-16, -10), Vector2(32, 22)), metal_hi, false, 1.5)
 	for vi in 4:
-		draw_line(gen_c + Vector2(-14, -8 + vi * 5),
-				  gen_c + Vector2(4, -8 + vi * 5), metal, 0.8)
-	# Panel de control
-	draw_rect(Rect2(gen_c + Vector2(6, -10), Vector2(10, 20)), Color(0.22, 0.24, 0.20))
-	draw_circle(gen_c + Vector2(11, -4), 2.5, Color(0.0, 0.9, 0.3,
-			0.8 + 0.2 * sin(_pulse_t * 4.2)))
-	draw_circle(gen_c + Vector2(11, 4),  1.8, Color(0.9, 0.5, 0.0, 0.75))
-	# Tubos de escape
-	draw_line(gen_c + Vector2(-10, -12), gen_c + Vector2(-10, -22), metal, 3.5)
-	draw_line(gen_c + Vector2(-4,  -12), gen_c + Vector2( -4, -20), metal, 3.5)
-	draw_arc(gen_c + Vector2(-7, -22), 3.5, PI, TAU, 8, metal_hi, 3.5)
+		draw_line(gc + Vector2(-12, -6 + vi * 5), gc + Vector2(4, -6 + vi * 5), metal, 0.8)
+	draw_rect(Rect2(gc + Vector2(4, -8), Vector2(10, 18)), Color(0.22, 0.24, 0.20))
+	draw_circle(gc + Vector2(9, -3), 2.5,
+		Color(0.0, 0.9, 0.3, 0.8 + 0.2 * sin(_pulse_t * 4.2)))
+	draw_circle(gc + Vector2(9, 4), 1.8, Color(0.9, 0.5, 0.0, 0.75))
+	draw_line(gc + Vector2(-8, -10), gc + Vector2(-8, -20), metal, 3.5)
+	draw_line(gc + Vector2(-2, -10), gc + Vector2(-2, -18), metal, 3.5)
 
-	# ── Franjas de peligro en muralla sur ──────────────────────────────────
-	var sw_local := Rect2(south_wall_rect.position - global_position, south_wall_rect.size)
-	for si in 10:
-		var sx: float = sw_local.position.x + 6.0 + si * 36.0
-		if sx + 18.0 > sw_local.position.x + sw_local.size.x - 6.0:
-			break
-		if (si % 2) == 0:
-			var stripe_pts := PackedVector2Array([
-				Vector2(sx,        sw_local.position.y + 6),
-				Vector2(sx + 18.0, sw_local.position.y + 6),
-				Vector2(sx + 14.0, sw_local.position.y + sw_local.size.y - 6),
-				Vector2(sx - 4.0,  sw_local.position.y + sw_local.size.y - 6),
-			])
-			draw_colored_polygon(stripe_pts, hazard)
-
-	# ── Marcas de panel en brazos ──────────────────────────────────────────
+	# Panel marks at arm midpoints
 	for k in arm_polygons:
 		var poly: Array = arm_polygons[k]
-		var mid_pt: Vector2 = Vector2.ZERO
+		var mp := Vector2.ZERO
 		for v in poly:
-			mid_pt += v as Vector2
-		mid_pt = mid_pt / float(poly.size()) - global_position
-		draw_rect(Rect2(mid_pt + Vector2(-8, -8), Vector2(16, 16)),
-				Color(0, 0, 0, 0), false)
-		draw_arc(mid_pt, 6.0, 0, TAU, 10, metal * Color(1,1,1,0.5), 1.0)
-		draw_line(mid_pt + Vector2(-9, 0), mid_pt + Vector2(9, 0),
-				metal * Color(1,1,1,0.4), 0.8)
-		draw_line(mid_pt + Vector2(0, -9), mid_pt + Vector2(0, 9),
-				metal * Color(1,1,1,0.4), 0.8)
+			mp += v as Vector2
+		mp = mp / float(poly.size()) - gp
+		draw_arc(mp, 6.0, 0, TAU, 10, metal * Color(1, 1, 1, 0.5), 1.0)
+		draw_line(mp + Vector2(-8, 0), mp + Vector2(8, 0), metal * Color(1, 1, 1, 0.4), 0.8)
+		draw_line(mp + Vector2(0, -8), mp + Vector2(0, 8), metal * Color(1, 1, 1, 0.4), 0.8)
+
+
+func _draw_wall_damage() -> void:
+	for fw in _fort_walls:
+		if not is_instance_valid(fw):
+			continue
+		var fw_node := fw as FortWall
+		if fw_node.hp >= fw_node.max_hp:
+			continue
+		var pct := float(fw_node.hp) / float(fw_node.max_hp)
+		if pct > 0.80:
+			continue
+		var intensity := 1.0 - pct
+		var cc := Color(COL_CRACK.r, COL_CRACK.g, COL_CRACK.b, COL_CRACK.a * intensity)
+
+		var cs_node: CollisionShape2D = null
+		for child in fw_node.get_children():
+			if child is CollisionShape2D:
+				cs_node = child as CollisionShape2D
+				break
+		if cs_node == null:
+			continue
+		var rs := cs_node.shape as RectangleShape2D
+		if rs == null:
+			continue
+
+		# fw_node.position is in Fortress local space — same space as _draw()
+		var half := rs.size * 0.5
+		var r    := Rect2(fw_node.position - half, rs.size)
+
+		if pct <= 0.0:
+			draw_line(r.position, r.position + r.size, cc, 3.0)
+			draw_line(r.position + Vector2(r.size.x, 0),
+				r.position + Vector2(0, r.size.y), cc, 3.0)
+		else:
+			var n_cracks := int((1.0 - pct) * 5.0) + 1
+			for i in n_cracks:
+				var t0 := float(i) / float(n_cracks)
+				var t1 := minf(t0 + 0.25, 1.0)
+				draw_line(
+					Vector2(r.position.x + r.size.x * t0, r.position.y),
+					Vector2(r.position.x + r.size.x * t1, r.position.y + r.size.y),
+					cc, 1.5)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API pública — usado por main / player / enemigos
+# Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ¿Está la posición dentro de alguna zona de escalera? Devuelve dict o null.
 func get_stair_at(pos: Vector2) -> Variant:
 	for sz in stair_zones:
 		if (sz["rect"] as Rect2).has_point(pos):
 			return sz
 	return null
 
-# ¿Qué nivel tiene esta posición global?
-# 0 = piso bajo (hex + brazos)
-# 1 = plataformas o muralla sur
-# 2 = torre L2
-# 3 = torre L3 (cima)
+
 func get_elevation_at(pos: Vector2) -> int:
 	if (tower_l3_rect as Rect2).has_point(pos):
 		return 3
 	if (tower_l2_rect as Rect2).has_point(pos):
 		return 2
-	for plat_rect in platform_polygons:
-		if (plat_rect as Rect2).has_point(pos):
-			return 1
 	if (south_wall_rect as Rect2).has_point(pos):
 		return 1
 	return 0
 
-# Devuelve la posición global de la puerta más cercana (para pathfinding de enemigos)
+
 func nearest_door_pos(from_pos: Vector2) -> Vector2:
-	var best_d := INF
-	var best_pos: Vector2 = door_centers["N"]
+	var best_d   := INF
+	var best_pos := door_centers["N"] as Vector2
 	for k in door_centers:
 		var d: float = from_pos.distance_to(door_centers[k])
 		if d < best_d:
-			best_d = d
+			best_d   = d
 			best_pos = door_centers[k]
 	return best_pos
 
-# ¿El punto está adentro del hexágono central? (para saber si un enemigo ya entró)
-func is_inside_hex(pos: Vector2) -> bool:
-	# Test simple: distancia al centro < apothem aproximado
-	var d: float = pos.distance_to(hex_center)
-	return d < (HEX_RADIUS * 0.85)
 
-# Obtener un slot por tipo (para construir la estación)
+func is_inside_hex(pos: Vector2) -> bool:
+	return pos.distance_to(hex_center) < (OCT_RADIUS * 0.85)
+
+
 func get_slot_by_type(stype: int) -> Slot:
 	for slot in slots:
 		if slot.stype == stype:
 			return slot
 	return null
 
+
 func has_station(stype: int) -> bool:
 	var slot := get_slot_by_type(stype)
 	return slot != null and slot.built
 
-# ¿La posición está sobre algún slot vacío? (para colocar estación)
+
 func get_slot_at(pos: Vector2) -> Slot:
 	for slot in slots:
-		var rect := Rect2(slot.pos - slot.size * 0.5, slot.size)
-		if rect.has_point(pos):
+		if Rect2(slot.pos - slot.size * 0.5, slot.size).has_point(pos):
 			return slot
 	return null
 
-# Construir estación (consume biomasa fuera de aquí)
+
 func build_station(stype: int) -> bool:
 	var slot := get_slot_by_type(stype)
 	if slot == null or slot.built:
 		return false
 	slot.built = true
-	slot.hp = slot.max_hp
+	slot.hp    = slot.max_hp
 	queue_redraw()
 	return true
 
-# Posición global del Núcleo (para que enemigos lo ataquen)
+
 func get_core_pos() -> Vector2:
 	return hex_center
 
-# Lista de centros de puerta para que el HUD muestre indicadores
+
 func get_door_centers() -> Dictionary:
 	return door_centers
 
-# Returns the Rect2 the player must stay within at the given elevation.
-# Level 0 returns an empty Rect2 (no constraint).
-# Level 1 returns the nearest level-1 area (corner platform or south wall).
-func get_level_bounds(level: int, pos: Vector2) -> Rect2:
+
+func get_level_bounds(level: int, _pos: Vector2) -> Rect2:
 	match level:
-		1:
-			var best: Rect2 = platform_polygons[0]
-			var best_d: float = pos.distance_to(best.get_center())
-			for r: Rect2 in platform_polygons:
-				var d: float = pos.distance_to(r.get_center())
-				if d < best_d:
-					best_d = d
-					best   = r
-			var sw_d: float = pos.distance_to(south_wall_rect.get_center())
-			if sw_d < best_d:
-				return south_wall_rect
-			return best
-		2:
-			return tower_l2_rect
-		3:
-			return tower_l3_rect
-		_:
-			return Rect2()
+		1: return south_wall_rect
+		2: return tower_l2_rect
+		3: return tower_l3_rect
+		_: return Rect2()
+
+
+func get_damageable_walls() -> Array:
+	return _fort_walls
