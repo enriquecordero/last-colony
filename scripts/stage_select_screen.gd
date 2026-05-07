@@ -78,6 +78,15 @@ func _build() -> void:
 	meta_btn.pressed.connect(_toggle_meta_panel)
 	add_child(meta_btn)
 
+	# CO-OP button — always visible, no mission selection required for client
+	_coop_btn          = Button.new()
+	_coop_btn.text     = "CO-OP ONLINE"
+	_coop_btn.add_theme_font_size_override("font_size", 16)
+	_coop_btn.size     = Vector2(175, 38)
+	_coop_btn.position = Vector2(VIEW_W - 195, VIEW_H - 52)
+	_coop_btn.pressed.connect(_on_coop_pressed)
+	add_child(_coop_btn)
+
 	var missions := StageRegistry.get_stage_missions("stage1")
 	for m in missions:
 		_build_card(m)
@@ -275,8 +284,8 @@ func _refresh_meta_cards() -> void:
 
 func _build_deploy_panel() -> void:
 	_deploy_panel          = Panel.new()
-	_deploy_panel.size     = Vector2(880, 78)
-	_deploy_panel.position = Vector2((VIEW_W - 880) * 0.5, VIEW_H - 90)
+	_deploy_panel.size     = Vector2(700, 78)
+	_deploy_panel.position = Vector2((VIEW_W - 700) * 0.5, VIEW_H - 90)
 	_deploy_panel.visible  = false
 	add_child(_deploy_panel)
 
@@ -298,14 +307,6 @@ func _build_deploy_panel() -> void:
 	_deploy_btn.position = Vector2(526, 16)
 	_deploy_btn.pressed.connect(_on_deploy_pressed)
 	_deploy_panel.add_child(_deploy_btn)
-
-	_coop_btn          = Button.new()
-	_coop_btn.text     = "CO-OP ONLINE"
-	_coop_btn.add_theme_font_size_override("font_size", 15)
-	_coop_btn.size     = Vector2(160, 46)
-	_coop_btn.position = Vector2(700, 16)
-	_coop_btn.pressed.connect(_on_coop_pressed)
-	_deploy_panel.add_child(_coop_btn)
 
 func _select_mission(id: String) -> void:
 	_selected_id       = id
@@ -357,8 +358,6 @@ func _do_deploy() -> void:
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 func _on_coop_pressed() -> void:
-	if _selected_id.is_empty():
-		return
 	StageManager.selected_mission_id = _selected_id
 	get_tree().change_scene_to_file("res://scenes/lobby.tscn")
 
