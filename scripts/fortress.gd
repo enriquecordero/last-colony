@@ -340,30 +340,30 @@ func _draw_arm_walls() -> void:
 	var gp := global_position
 
 	var arm_n: Array = arm_polygons["N"]
-	var n_bl := arm_n[0] - gp
-	var n_tl := arm_n[1] - gp
-	var n_tr := arm_n[2] - gp
-	var n_br := arm_n[3] - gp
+	var n_bl: Vector2 = arm_n[0] - gp
+	var n_tl: Vector2 = arm_n[1] - gp
+	var n_tr: Vector2 = arm_n[2] - gp
+	var n_br: Vector2 = arm_n[3] - gp
 	draw_line(n_tl, n_bl, COL_WALL_EDGE, 4.0)
 	draw_line(n_tr, n_br, COL_WALL_EDGE, 4.0)
 	draw_line(n_tl, n_tl + Vector2(8,  0),  COL_WALL_EDGE, 4.0)
 	draw_line(n_tr, n_tr + Vector2(-8, 0),  COL_WALL_EDGE, 4.0)
 
 	var arm_e: Array = arm_polygons["E"]
-	var e_tl := arm_e[0] - gp
-	var e_tr := arm_e[1] - gp
-	var e_br := arm_e[2] - gp
-	var e_bl := arm_e[3] - gp
+	var e_tl: Vector2 = arm_e[0] - gp
+	var e_tr: Vector2 = arm_e[1] - gp
+	var e_br: Vector2 = arm_e[2] - gp
+	var e_bl: Vector2 = arm_e[3] - gp
 	draw_line(e_tl, e_tr, COL_WALL_EDGE, 4.0)
 	draw_line(e_bl, e_br, COL_WALL_EDGE, 4.0)
 	draw_line(e_tr, e_tr + Vector2(0,  8),  COL_WALL_EDGE, 4.0)
 	draw_line(e_br, e_br + Vector2(0, -8),  COL_WALL_EDGE, 4.0)
 
 	var arm_w: Array = arm_polygons["W"]
-	var w_tl := arm_w[0] - gp
-	var w_tr := arm_w[1] - gp
-	var w_br := arm_w[2] - gp
-	var w_bl := arm_w[3] - gp
+	var w_tl: Vector2 = arm_w[0] - gp
+	var w_tr: Vector2 = arm_w[1] - gp
+	var w_br: Vector2 = arm_w[2] - gp
+	var w_bl: Vector2 = arm_w[3] - gp
 	draw_line(w_tl, w_tr, COL_WALL_EDGE, 4.0)
 	draw_line(w_bl, w_br, COL_WALL_EDGE, 4.0)
 	draw_line(w_tl, w_tl + Vector2(0,  8),  COL_WALL_EDGE, 4.0)
