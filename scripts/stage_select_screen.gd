@@ -186,7 +186,7 @@ func _build_meta_panel() -> void:
 		var key: String     = keys[i]
 		var info: Dictionary = StageManager.META_TREE[key]
 		var col_i: int = i % cols
-		var row_i: int = i / cols
+		var row_i: int = floori(float(i) / float(cols))
 		var cx: float = pad_x + col_i * (card_w + gap_x)
 		var cy: float = pad_y + row_i * (card_h + gap_y)
 
