@@ -133,6 +133,8 @@ func _draw() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if not is_multiplayer_authority():
+		return
 	_dash_t  = maxf(_dash_t  - delta, 0.0)
 	_dash_cd = maxf(_dash_cd - delta, 0.0)
 	if _dash_t > 0.0 or _dash_cd > 0.0:
@@ -183,8 +185,13 @@ func _physics_process(delta: float) -> void:
 			if _can_reload():
 				_start_reload()
 
+	if StageManager.is_multiplayer:
+		_net_sync.rpc(global_position, rotation)
+
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not is_multiplayer_authority():
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_1: _set_weapon(Weapon.RIFLE)
@@ -519,3 +526,9 @@ func apply_meta_ammo(level: int) -> void:
 func apply_meta_damage(level: int) -> void:
 	const MULT := [1.0, 1.15, 1.30, 1.50]
 	_damage_mult = MULT[clamp(level, 0, 3)]
+
+
+@rpc("any_peer", "unreliable_ordered")
+func _net_sync(pos: Vector2, rot: float) -> void:
+	global_position = pos
+	rotation = rot

@@ -12,6 +12,7 @@ const META_TREE := {
 	"rockets":  {"label": "COHETES",    "max": 3, "costs": [30, 50, 80], "color": Color(1.00, 0.35, 0.35)},
 }
 
+var is_multiplayer:      bool       = false
 var selected_mission_id: String     = ""
 var completed_missions:  Array      = []
 var unlocked_rewards:    Array      = []

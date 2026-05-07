@@ -65,6 +65,7 @@ const BUILD_PHASE_TIME := 11.0
 const MAX_TURRETS      := 3
 
 var _player:          CharacterBody2D
+var _player2:         CharacterBody2D = null
 var _enemies:         Node2D
 var _friendlies:      Node2D
 var _bullets:         Node2D
@@ -430,8 +431,42 @@ func _start_game() -> void:
 	if _player.has_signal("rocket_fired"):
 		_player.rocket_fired.connect(_on_rocket_fired)
 	_apply_meta_upgrades()
+
+	if StageManager.is_multiplayer:
+		_init_multiplayer_players()
+		if not multiplayer.is_server():
+			_mission_active = true
+			return
+
 	_setup_mission_runtime()
 	_start_build_phase()
+
+func _init_multiplayer_players() -> void:
+	_player.set_multiplayer_authority(1)
+	if multiplayer.is_server():
+		var peers := multiplayer.get_peers()
+		if peers.size() > 0:
+			_rpc_init_player2.rpc(peers[0])
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_init_player2(client_peer_id: int) -> void:
+	_player2          = PLAYER_SCENE.instantiate()
+	_player2.name     = "Player2"
+	_player2.position = BASE_POS + Vector2(60, 0)
+	_player2.bullet_container = _bullets
+	if "fortress" in _player2:
+		_player2.fortress = _fortress
+	_player2.died.connect(_on_player_died)
+	_player2.set_multiplayer_authority(client_peer_id)
+	_player2.set_physics_process(true)
+	_player2.set_process_unhandled_input(true)
+	add_child(_player2)
+
+func _get_local_player() -> Node2D:
+	if StageManager.is_multiplayer and is_instance_valid(_player2) \
+			and _player2.is_multiplayer_authority():
+		return _player2
+	return _player
 
 func _setup_mission_runtime() -> void:
 	var mid := StageManager.selected_mission_id
@@ -863,8 +898,9 @@ func _physics_process(delta: float) -> void:
 func _tick_camera() -> void:
 	if _game_over:
 		return
-	if is_instance_valid(_player):
-		_camera.position = _player.global_position
+	var p := _get_local_player()
+	if is_instance_valid(p):
+		_camera.position = p.global_position
 
 func _tick_base_damage(delta: float) -> void:
 	if _base_hp <= 0 or _game_over:

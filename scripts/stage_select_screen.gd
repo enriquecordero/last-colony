@@ -36,6 +36,7 @@ var _deploy_panel:     Panel      = null
 var _deploy_name_lbl:  Label      = null
 var _deploy_warn_lbl:  Label      = null
 var _deploy_btn:       Button     = null
+var _coop_btn:         Button     = null
 var _meta_panel:       Panel      = null
 var _chatarra_lbl:     Label      = null
 var _meta_card_lbls:   Dictionary = {}
@@ -274,8 +275,8 @@ func _refresh_meta_cards() -> void:
 
 func _build_deploy_panel() -> void:
 	_deploy_panel          = Panel.new()
-	_deploy_panel.size     = Vector2(700, 78)
-	_deploy_panel.position = Vector2((VIEW_W - 700) * 0.5, VIEW_H - 90)
+	_deploy_panel.size     = Vector2(880, 78)
+	_deploy_panel.position = Vector2((VIEW_W - 880) * 0.5, VIEW_H - 90)
 	_deploy_panel.visible  = false
 	add_child(_deploy_panel)
 
@@ -297,6 +298,14 @@ func _build_deploy_panel() -> void:
 	_deploy_btn.position = Vector2(526, 16)
 	_deploy_btn.pressed.connect(_on_deploy_pressed)
 	_deploy_panel.add_child(_deploy_btn)
+
+	_coop_btn          = Button.new()
+	_coop_btn.text     = "CO-OP ONLINE"
+	_coop_btn.add_theme_font_size_override("font_size", 15)
+	_coop_btn.size     = Vector2(160, 46)
+	_coop_btn.position = Vector2(700, 16)
+	_coop_btn.pressed.connect(_on_coop_pressed)
+	_deploy_panel.add_child(_coop_btn)
 
 func _select_mission(id: String) -> void:
 	_selected_id       = id
@@ -344,7 +353,14 @@ func _on_deploy_pressed() -> void:
 
 func _do_deploy() -> void:
 	StageManager.selected_mission_id = _selected_id
+	StageManager.is_multiplayer = false
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+func _on_coop_pressed() -> void:
+	if _selected_id.is_empty():
+		return
+	StageManager.selected_mission_id = _selected_id
+	get_tree().change_scene_to_file("res://scenes/lobby.tscn")
 
 func _draw() -> void:
 	for pair in _CONNECTIONS:
