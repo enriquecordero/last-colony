@@ -57,7 +57,7 @@ const AMMO_DROP_SHOTGUN := 2
 
 enum BuildType { WALL, TURRET, WALL_PLUS, MINE }
 
-const BUILD_PHASE_TIME := 15.0
+const BUILD_PHASE_TIME := 11.0
 const MAX_TURRETS      := 3
 
 var _player:          CharacterBody2D
@@ -444,11 +444,22 @@ func _setup_mission_runtime() -> void:
 func _spawn_pre_populate(count: int) -> void:
 	if count <= 0:
 		return
-	for _i in count:
-		var e = LARVA_SCENE.instantiate()
-		e.speed            = 55.0
-		e.max_hp           = 20
-		e.hp               = 20
+	for i in count:
+		var e: CharacterBody2D
+		var r := randf()
+		if r < 0.20:
+			e = SALTADORA_SCENE.instantiate()
+			e.speed  = 110.0
+			e.max_hp = 35
+		elif r < 0.35:
+			e = EXPLOSIVO_SCENE.instantiate()
+			e.speed  = 65.0
+			e.max_hp = 60
+		else:
+			e = LARVA_SCENE.instantiate()
+			e.speed  = 75.0 + float(i) * 1.5
+			e.max_hp = 25
+		e.hp               = e.max_hp
 		e.player           = _player
 		e.base_pos         = BASE_POS
 		e.bullet_container = _bullets

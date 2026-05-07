@@ -34,8 +34,8 @@ func _register_stage1() -> void:
 	m1.description          = "Establecer perímetro. Sobrevivir 5 oleadas."
 	m1.type                 = _MissionData.MissionType.INCURSION
 	m1.objective_type       = _MissionData.ObjectiveType.SURVIVE_WAVES
-	m1.max_waves            = 5
-	m1.pre_populate_enemies = 10
+	m1.max_waves            = 8
+	m1.pre_populate_enemies = 22
 	m1.required_missions    = []
 	m1.is_optional          = false
 	m1.reward_chatarra      = 30
@@ -50,7 +50,7 @@ func _register_stage1() -> void:
 	m2.objective_type       = _MissionData.ObjectiveType.ACTIVATE_BEACONS
 	m2.objective_count      = 2
 	m2.max_waves            = 0
-	m2.pre_populate_enemies = 15
+	m2.pre_populate_enemies = 28
 	m2.required_missions    = ["stage1_recon"]
 	m2.is_optional          = true
 	m2.reward_chatarra      = 20
@@ -65,7 +65,7 @@ func _register_stage1() -> void:
 	m3.objective_type       = _MissionData.ObjectiveType.COLLECT_CACHES
 	m3.objective_count      = 3
 	m3.max_waves            = 0
-	m3.pre_populate_enemies = 12
+	m3.pre_populate_enemies = 22
 	m3.required_missions    = ["stage1_recon"]
 	m3.is_optional          = true
 	m3.reward_chatarra      = 20
@@ -80,7 +80,7 @@ func _register_stage1() -> void:
 	m4.objective_type          = _MissionData.ObjectiveType.CLOSE_BURROWS
 	m4.objective_count         = 4
 	m4.max_waves               = 0
-	m4.pre_populate_enemies    = 25
+	m4.pre_populate_enemies    = 38
 	m4.required_missions       = ["stage1_recon"]
 	m4.required_optional_group = ["stage1_satellite", "stage1_research"]
 	m4.required_optional_count = 1
