@@ -471,7 +471,7 @@ func _draw_arm_interiors() -> void:
 	])
 	draw_colored_polygon(bolt, Color(0.0, 0.83, 1.0, 0.45))
 
-	var _ := gp  # suppress unused warning
+	if gp == Vector2.ZERO: pass  # suppress unused warning
 
 
 func _draw_gates() -> void:
