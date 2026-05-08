@@ -22,6 +22,13 @@ const _STAGE_POSITIONS: Dictionary = {
 		"stage2_siege":         Vector2(640, 440),
 		"stage2_queen":         Vector2(640, 575),
 	},
+	"stage3": {
+		"stage3_ruptura":       Vector2(640, 145),
+		"stage3_rescate":       Vector2(370, 292),
+		"stage3_purga":         Vector2(910, 292),
+		"stage3_baluarte":      Vector2(640, 440),
+		"stage3_mente":         Vector2(640, 575),
+	},
 }
 
 const _STAGE_CONNECTIONS: Dictionary = {
@@ -39,6 +46,19 @@ const _STAGE_CONNECTIONS: Dictionary = {
 		["stage2_extermination", "stage2_siege"],
 		["stage2_siege",         "stage2_queen"],
 	],
+	"stage3": [
+		["stage3_ruptura",  "stage3_rescate"],
+		["stage3_ruptura",  "stage3_purga"],
+		["stage3_rescate",  "stage3_baluarte"],
+		["stage3_purga",    "stage3_baluarte"],
+		["stage3_baluarte", "stage3_mente"],
+	],
+}
+
+const _STAGE_TITLES: Dictionary = {
+	"stage1": "◈  SECTOR ALPHA  ◈",
+	"stage2": "◈  SECTOR BETA  ◈",
+	"stage3": "◈  SECTOR OMEGA  ◈",
 }
 
 const COL_AVAILABLE := Color(0.25, 0.82, 0.42)
@@ -59,6 +79,7 @@ var _coop_btn:         Button     = null
 var _meta_panel:       Panel      = null
 var _chatarra_lbl:     Label      = null
 var _meta_card_lbls:   Dictionary = {}
+var _title_lbl:        Label      = null
 
 func _ready() -> void:
 	_build()
@@ -69,11 +90,11 @@ func _build() -> void:
 	bg.color = Color(0.04, 0.04, 0.08)
 	add_child(bg)
 
-	var title := _lbl("◈  SECTOR ALPHA  ◈", 32, Color(0.3, 1.0, 0.42))
-	title.size                 = Vector2(VIEW_W, 42)
-	title.position             = Vector2(0, 20)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	add_child(title)
+	_title_lbl = _lbl("◈  SECTOR ALPHA  ◈", 32, Color(0.3, 1.0, 0.42))
+	_title_lbl.size                 = Vector2(VIEW_W, 42)
+	_title_lbl.position             = Vector2(0, 20)
+	_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(_title_lbl)
 
 	var sub := _lbl("Seleccioná una misión", 14, Color(0.45, 0.65, 0.45))
 	sub.size                 = Vector2(VIEW_W, 22)
@@ -95,9 +116,18 @@ func _build() -> void:
 		s2_btn.text = "STAGE 2  ►"
 		s2_btn.add_theme_font_size_override("font_size", 14)
 		s2_btn.size     = Vector2(140, 30)
-		s2_btn.position = Vector2(VIEW_W - 160, 86)
+		s2_btn.position = Vector2(VIEW_W * 0.5 - 70, 86)
 		s2_btn.pressed.connect(func() -> void: _switch_stage("stage2"))
 		add_child(s2_btn)
+
+	if StageManager.is_reward_unlocked("stage2_complete"):
+		var s3_btn := Button.new()
+		s3_btn.text = "STAGE 3  ►"
+		s3_btn.add_theme_font_size_override("font_size", 14)
+		s3_btn.size     = Vector2(140, 30)
+		s3_btn.position = Vector2(VIEW_W - 160, 86)
+		s3_btn.pressed.connect(func() -> void: _switch_stage("stage3"))
+		add_child(s3_btn)
 
 	# Chatarra banked display
 	_chatarra_lbl = _lbl("CHATARRA: %d" % StageManager.chatarra_banked, 16, Color(0.3, 0.95, 0.55))
@@ -372,7 +402,8 @@ func _update_deploy_panel() -> void:
 	var is_survival: bool = (mission.type == MissionData.MissionType.SURVIVAL)
 	_deploy_warn_lbl.visible = is_survival as bool
 	if is_survival:
-		_deploy_warn_lbl.text = "[!] SURVIVAL — si fallás perdés el progreso del Stage 1"
+		var stage_num := _current_stage_id.trim_prefix("stage")
+		_deploy_warn_lbl.text = "[!] SURVIVAL — si fallás perdés el progreso del Stage %s" % stage_num
 
 	_deploy_panel.visible = true
 
@@ -404,6 +435,8 @@ func _switch_stage(stage_id: String) -> void:
 	_current_stage_id = stage_id
 	_selected_id      = ""
 	_survival_confirm = false
+	if _title_lbl:
+		_title_lbl.text = _STAGE_TITLES.get(stage_id, "◈  STAGE  ◈")
 	for panel in _card_panels.values():
 		panel.queue_free()
 	_card_panels.clear()
@@ -447,6 +480,8 @@ func _reward_str(reward_id: String) -> String:
 		"full_minimap":    return "Mapa completo"
 		"antiserum":       return "Suero antiinfeccion"
 		"stage1_complete": return "Desbloquea Stage 2"
+		"stage2_complete": return "Desbloquea Stage 3"
+		"stage3_complete": return "¡Victoria Final!"
 		_:                 return reward_id
 
 func _lbl(text: String, sz: int, color: Color) -> Label:

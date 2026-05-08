@@ -9,6 +9,7 @@ var _missions: Dictionary = {}
 func _ready() -> void:
 	_register_stage1()
 	_register_stage2()
+	_register_stage3()
 
 func get_stage(id: String):
 	return _stages.get(id, null)
@@ -187,6 +188,89 @@ func _register_stage2() -> void:
 	m5.is_optional          = false
 	m5.reward_chatarra      = 200
 	m5.reward_id            = "stage2_complete"
+
+	s.missions    = [m1, m2, m3, m4, m5]
+	_stages[s.id] = s
+	for m in s.missions:
+		_missions[m.id] = m
+
+
+func _register_stage3() -> void:
+	var s := _StageData.new()
+	s.id           = "stage3"
+	s.display_name = "Sector Omega"
+	s.biome        = "corrupted_core"
+
+	var m1 := _MissionData.new()
+	m1.id                   = "stage3_ruptura"
+	m1.stage_id             = "stage3"
+	m1.display_name         = "La Ruptura"
+	m1.description          = "El perímetro ha colapsado. Sobrevivir la oleada de convergencia. Corruptores y Destructores desde el inicio."
+	m1.type                 = _MissionData.MissionType.INCURSION
+	m1.objective_type       = _MissionData.ObjectiveType.SURVIVE_WAVES
+	m1.max_waves            = 10
+	m1.pre_populate_enemies = 40
+	m1.required_missions    = ["stage2_complete"]
+	m1.is_optional          = false
+	m1.reward_chatarra      = 80
+
+	var m2 := _MissionData.new()
+	m2.id                   = "stage3_rescate"
+	m2.stage_id             = "stage3"
+	m2.display_name         = "Rescate"
+	m2.description          = "Recuperar 4 cachés de evacuación en zona de alta corrupción. Evitá los charcos ácidos."
+	m2.type                 = _MissionData.MissionType.INCURSION
+	m2.objective_type       = _MissionData.ObjectiveType.COLLECT_CACHES
+	m2.objective_count      = 4
+	m2.max_waves            = 0
+	m2.pre_populate_enemies = 45
+	m2.required_missions    = ["stage3_ruptura"]
+	m2.is_optional          = true
+	m2.reward_chatarra      = 60
+
+	var m3 := _MissionData.new()
+	m3.id                      = "stage3_purga"
+	m3.stage_id                = "stage3"
+	m3.display_name            = "Purga Total"
+	m3.description             = "Cerrar 6 madrigueras en el núcleo corrupto. Los excavadores son más resistentes y rápidos."
+	m3.type                    = _MissionData.MissionType.INCURSION
+	m3.objective_type          = _MissionData.ObjectiveType.CLOSE_BURROWS
+	m3.objective_count         = 6
+	m3.max_waves               = 0
+	m3.pre_populate_enemies    = 50
+	m3.required_missions       = ["stage3_ruptura"]
+	m3.is_optional             = true
+	m3.reward_chatarra         = 60
+
+	var m4 := _MissionData.new()
+	m4.id                      = "stage3_baluarte"
+	m4.stage_id                = "stage3"
+	m4.display_name            = "Último Baluarte"
+	m4.description             = "Oleada final de convergencia. Todos los tipos de enemigos. Sobrevivir 20 oleadas."
+	m4.type                    = _MissionData.MissionType.SURVIVAL
+	m4.objective_type          = _MissionData.ObjectiveType.SURVIVE_WAVES
+	m4.max_waves               = 20
+	m4.pre_populate_enemies    = 0
+	m4.required_missions       = ["stage3_ruptura"]
+	m4.required_optional_group = ["stage3_rescate", "stage3_purga"]
+	m4.required_optional_count = 1
+	m4.is_optional             = false
+	m4.reward_chatarra         = 180
+
+	var m5 := _MissionData.new()
+	m5.id                   = "stage3_mente"
+	m5.stage_id             = "stage3"
+	m5.display_name         = "La Mente Colmena"
+	m5.description          = "El nodo central. 3 fases, pulsos corrosivos, enjambres constantes. Eliminar para ganar."
+	m5.type                 = _MissionData.MissionType.SURVIVAL
+	m5.objective_type       = _MissionData.ObjectiveType.KILL_BOSS
+	m5.objective_count      = 1
+	m5.max_waves            = 8
+	m5.pre_populate_enemies = 0
+	m5.required_missions    = ["stage3_baluarte"]
+	m5.is_optional          = false
+	m5.reward_chatarra      = 350
+	m5.reward_id            = "stage3_complete"
 
 	s.missions    = [m1, m2, m3, m4, m5]
 	_stages[s.id] = s

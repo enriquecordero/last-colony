@@ -40,10 +40,13 @@ const NPCMedic          = preload("res://scripts/npc_medic.gd")
 const NPCEngineer       = preload("res://scripts/npc_engineer.gd")
 const NPCFrancotirador  = preload("res://scripts/npc_francotirador.gd")
 const NPCDemoliciones   = preload("res://scripts/npc_demoliciones.gd")
-const FortressSkillTree      = preload("res://scripts/fortress_skill_tree.gd")
-const FortressAmmoStation    = preload("res://scripts/fortress_ammo_station.gd")
+const FortressSkillTree        = preload("res://scripts/fortress_skill_tree.gd")
+const FortressAmmoStation      = preload("res://scripts/fortress_ammo_station.gd")
 const FortressGeneratorStation = preload("res://scripts/fortress_generator_station.gd")
-const DESTRUCTOR_SCENE       = preload("res://scenes/destructor.tscn")
+const DESTRUCTOR_SCENE         = preload("res://scenes/destructor.tscn")
+const CORRUPTOR_SCENE          = preload("res://scenes/corruptor.tscn")
+const MenteColmena             = preload("res://scripts/mente_colmena.gd")
+const AcidPool                 = preload("res://scripts/acid_pool.gd")
 
 const VIEW_W   := 1280.0
 const VIEW_H   := 720.0
@@ -879,20 +882,38 @@ func _spawn_boss() -> void:
 	arena.position = boss_pos + Vector2(0, 30)
 	_mission_objects.add_child(arena)
 
-	_boss                  = Engendro.new()
-	_boss.position         = boss_pos
-	_boss.player           = _player
-	_boss.base_pos         = BASE_POS
-	_boss.bullet_container = _bullets
-	_boss.walls_node       = _walls
-	if "fortress" in _boss:
-		_boss.fortress = _fortress
-	_boss.died.connect(_on_boss_died)
-	_boss.summoned_larva.connect(_on_boss_summoned_larva)
-	_boss.rugido_emitted.connect(_on_boss_rugido)
-	_boss.phase2_entered.connect(_on_boss_phase2)
-	_enemies.add_child(_boss)
-	_hud.show_npc_announcement("¡EL ENGENDRO HA LLEGADO!", Color(1.0, 0.25, 0.1))
+	var is_stage3 := StageManager.selected_mission_id.begins_with("stage3")
+	if is_stage3:
+		_boss                  = MenteColmena.new()
+		_boss.position         = boss_pos
+		_boss.player           = _player
+		_boss.base_pos         = BASE_POS
+		_boss.bullet_container = _bullets
+		_boss.walls_node       = _walls
+		if "fortress" in _boss:
+			_boss.fortress = _fortress
+		_boss.died.connect(_on_boss_died)
+		_boss.summoned_larva.connect(_on_boss_summoned_larva)
+		_boss.rugido_emitted.connect(_on_boss_rugido)
+		_boss.phase2_entered.connect(_on_boss_phase2)
+		_boss.corrosive_pulse_emitted.connect(_on_boss_corrosive_pulse)
+		_enemies.add_child(_boss)
+		_hud.show_npc_announcement("¡LA MENTE COLMENA DESPIERTA!", Color(0.85, 0.20, 1.0))
+	else:
+		_boss                  = Engendro.new()
+		_boss.position         = boss_pos
+		_boss.player           = _player
+		_boss.base_pos         = BASE_POS
+		_boss.bullet_container = _bullets
+		_boss.walls_node       = _walls
+		if "fortress" in _boss:
+			_boss.fortress = _fortress
+		_boss.died.connect(_on_boss_died)
+		_boss.summoned_larva.connect(_on_boss_summoned_larva)
+		_boss.rugido_emitted.connect(_on_boss_rugido)
+		_boss.phase2_entered.connect(_on_boss_phase2)
+		_enemies.add_child(_boss)
+		_hud.show_npc_announcement("¡EL ENGENDRO HA LLEGADO!", Color(1.0, 0.25, 0.1))
 
 func _on_boss_died(e: Node) -> void:
 	var boss_pos: Vector2 = e.global_position
@@ -920,7 +941,18 @@ func _on_boss_rugido() -> void:
 
 func _on_boss_phase2() -> void:
 	shake(18.0)
-	_hud.show_npc_announcement("¡EL ENGENDRO ENTRA EN FRENESÍ — FASE 2!", Color(1.0, 0.15, 0.05))
+	if StageManager.selected_mission_id.begins_with("stage3"):
+		var phase := _boss.get("_phase") if is_instance_valid(_boss) else 2
+		if phase == 3:
+			_hud.show_npc_announcement("¡MENTE COLMENA — FASE 3! PULSO CORROSIVO CONSTANTE", Color(1.0, 0.15, 0.45))
+		else:
+			_hud.show_npc_announcement("¡MENTE COLMENA — FASE 2! PULSO CORROSIVO ACTIVO", Color(0.85, 0.20, 1.0))
+	else:
+		_hud.show_npc_announcement("¡EL ENGENDRO ENTRA EN FRENESÍ — FASE 2!", Color(1.0, 0.15, 0.05))
+
+func _on_boss_corrosive_pulse(_pos: Vector2, _radius: float) -> void:
+	shake(12.0)
+	_hud.show_npc_announcement("¡PULSO CORROSIVO!", Color(0.60, 1.0, 0.15))
 
 func _on_burrow_closed(_burrow: Node) -> void:
 	_burrows_closed += 1
@@ -1531,6 +1563,7 @@ func _start_mission() -> void:
 func _spawn_wave() -> void:
 	var is_survival: bool  = _is_survival()
 	var is_stage2:   bool  = StageManager.selected_mission_id.begins_with("stage2")
+	var is_stage3:   bool  = StageManager.selected_mission_id.begins_with("stage3")
 
 	var hp_mult:  float = 1.0 + (_wave - 1) * (0.55 if is_survival else 0.38)
 	var base_spd: float = (115.0 + (_wave - 1) * 25.0) if is_survival else (95.0 + (_wave - 1) * 20.0)
@@ -1540,6 +1573,11 @@ func _spawn_wave() -> void:
 		hp_mult  *= 1.35
 		base_spd *= 1.20
 		count     = int(count * 1.25)
+	if is_stage3:
+		hp_mult  *= 1.75
+		base_spd *= 1.45
+		count     = int(count * 1.45)
+		interval  = maxf(interval * 0.80, 0.04)
 
 	_wave_total = count
 	_killed     = 0
@@ -1551,7 +1589,24 @@ func _spawn_wave() -> void:
 			return
 		var e: CharacterBody2D
 		var r := randf()
-		if is_stage2:
+		if is_stage3:
+			if _wave >= 2 and r < 0.08:
+				e = TANQUE_SCENE.instantiate();     e.speed = base_spd * 0.28
+			elif r < 0.16:
+				e = CORRUPTOR_SCENE.instantiate();  e.speed = base_spd * 0.38
+			elif r < 0.28:
+				e = VOLADOR_SCENE.instantiate();    e.speed = base_spd * 1.55
+			elif r < 0.40:
+				e = EXCAVADOR_SCENE.instantiate();  e.speed = base_spd * 0.90
+			elif r < 0.52:
+				e = BLINDADO_SCENE.instantiate();   e.speed = base_spd * 0.55
+			elif r < 0.62:
+				e = ESCUPIDOR_SCENE.instantiate();  e.speed = base_spd * 0.88
+			elif r < 0.74:
+				e = SALTADORA_SCENE.instantiate();  e.speed = base_spd * 1.90
+			else:
+				e = LARVA_SCENE.instantiate();      e.speed = base_spd
+		elif is_stage2:
 			if _wave >= 3 and r < 0.06:
 				e = TANQUE_SCENE.instantiate();     e.speed = base_spd * 0.30
 			elif r < 0.20:
@@ -1599,9 +1654,11 @@ func _spawn_wave() -> void:
 		e.position = _pick_interior_spawn_pos() if e.get("is_excavador") else _pick_spawn_pos()
 		_enemies.add_child(e)
 
-	# Destructores — spawnean separados del conteo normal, oleada 3+
+	# Destructores — spawnean separados del conteo normal
 	var destructor_count := 0
-	if is_stage2 and _wave >= 2:
+	if is_stage3:
+		destructor_count = mini(_wave, 5)          # desde oleada 1
+	elif is_stage2 and _wave >= 2:
 		destructor_count = mini(_wave - 1, 4)
 	elif is_survival and _wave >= 3:
 		destructor_count = mini(_wave - 2, 3)
@@ -1807,6 +1864,15 @@ func _on_enemy_died(e: Node) -> void:
 	_killed += 1
 	_hud.update_kills(_kills)
 	_hud.update_enemy_progress(_killed, _wave_total)
+
+	if e.get("spawns_acid") == true:
+		var pool := AcidPool.new()
+		pool.global_position = e.global_position
+		pool.player          = _get_local_player()
+		if is_instance_valid(_assault_npc):  pool._allies.append(_assault_npc)
+		if is_instance_valid(_medic_npc):    pool._allies.append(_medic_npc)
+		add_child(pool)
+
 	var mhp: int = int(e.get("max_hp") if e.get("max_hp") != null else 10)
 	var ef_scale := 1.0
 	var shk      := 1.2
