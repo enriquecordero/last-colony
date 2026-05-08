@@ -41,9 +41,9 @@ func _draw() -> void:
 	draw_arc(Vector2.ZERO,   RADIUS, 0, TAU, 24, Color(0.70, 1.0, 0.15, fade * 0.80), 2.5)
 
 	for i in 6:
-		var a   := _t * 1.6 + i * TAU / 6.0
-		var br  := RADIUS * (0.30 + 0.38 * abs(sin(_t * 1.1 + i * 1.3)))
-		var bpos := Vector2(cos(a), sin(a)) * br
+		var a:    float   = _t * 1.6 + i * TAU / 6.0
+		var br:   float   = RADIUS * (0.30 + 0.38 * absf(sin(_t * 1.1 + i * 1.3)))
+		var bpos: Vector2 = Vector2(cos(a), sin(a)) * br
 		draw_circle(bpos, 4.0 * fade, Color(0.80, 1.0, 0.12, fade * 1.1))
 		draw_circle(bpos, 1.6 * fade, Color(1.0,  1.0, 0.55, fade * 1.3))
 
