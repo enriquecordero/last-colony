@@ -87,6 +87,9 @@ var _apo: float   # OCT_RADIUS * cos(22.5°) ≈ 110.87
 var _fort_walls: Array = []
 var _pulse_t: float = 0.0
 
+var show_zone_hints: bool  = false
+var player_pos:     Vector2 = Vector2.ZERO
+
 
 func _ready() -> void:
 	z_index = 0
@@ -341,6 +344,10 @@ func _draw() -> void:
 	# 12) Wall damage overlay
 	_draw_wall_damage()
 
+	# 13) Zone interaction hints
+	if show_zone_hints:
+		_draw_zone_hints()
+
 
 func _draw_arm_walls() -> void:
 	var gp := global_position
@@ -590,6 +597,26 @@ func _draw_wall_damage() -> void:
 					cc, 1.5)
 
 
+func _draw_zone_hints() -> void:
+	var f := ThemeDB.fallback_font
+
+	# Core → skill tree
+	var dist_core := player_pos.distance_to(hex_center)
+	var alpha_core := clampf(1.0 - (dist_core - 55.0) / 35.0, 0.0, 1.0)
+	if alpha_core > 0.0:
+		draw_string(f, Vector2(-62.0, -46.0), "[F]  ÁRBOL DE HABILIDADES",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.30, 1.0, 0.42, alpha_core))
+
+	# East arm → armería
+	var east_arm_mid_global := hex_center + Vector2(_apo + ARM_LEN * 0.5, 0.0)
+	var dist_east  := player_pos.distance_to(east_arm_mid_global)
+	var alpha_east := clampf(1.0 - (dist_east - 55.0) / 35.0, 0.0, 1.0)
+	if alpha_east > 0.0:
+		var local_x := _apo + ARM_LEN * 0.5
+		draw_string(f, Vector2(local_x - 32.0, -34.0), "[F]  ARMERÍA",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1.0, 0.85, 0.30, alpha_east))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
@@ -661,6 +688,9 @@ func get_core_pos() -> Vector2:
 
 func get_door_centers() -> Dictionary:
 	return door_centers
+
+func get_east_arm_mid() -> Vector2:
+	return hex_center + Vector2(_apo + ARM_LEN * 0.5, 0.0)
 
 
 func get_level_bounds(level: int, _pos: Vector2) -> Rect2:

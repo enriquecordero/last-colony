@@ -522,6 +522,14 @@ func add_rockets(n: int) -> void:
 	_rocket_reserve = mini(_rocket_reserve + n, ROCKET_MAX_RESERVE)
 	_emit_ammo()
 
+func add_sniper_ammo(n: int) -> void:
+	_sniper_reserve = mini(_sniper_reserve + n, SNIPER_MAX_RESERVE)
+	_emit_ammo()
+
+func add_flame_fuel(n: int) -> void:
+	_flame_fuel = mini(_flame_fuel + n, FLAME_MAG_SIZE)
+	_emit_ammo()
+
 func refill_ammo() -> void:
 	_rifle_reserve   = RIFLE_MAX_RESERVE
 	_shotgun_reserve = SHOTGUN_MAX_RESERVE

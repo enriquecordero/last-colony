@@ -40,6 +40,8 @@ const NPCMedic          = preload("res://scripts/npc_medic.gd")
 const NPCEngineer       = preload("res://scripts/npc_engineer.gd")
 const NPCFrancotirador  = preload("res://scripts/npc_francotirador.gd")
 const NPCDemoliciones   = preload("res://scripts/npc_demoliciones.gd")
+const FortressSkillTree  = preload("res://scripts/fortress_skill_tree.gd")
+const FortressAmmoStation = preload("res://scripts/fortress_ammo_station.gd")
 
 const VIEW_W   := 1280.0
 const VIEW_H   := 720.0
@@ -133,6 +135,9 @@ var _regen_t:        float       = 0.0
 var _event_cd:       float       = 70.0
 var _game_elapsed:   float       = 0.0
 
+var _skill_tree:    CanvasLayer = null
+var _ammo_station:  CanvasLayer = null
+
 func _ready() -> void:
 	_build_scene()
 	if StageManager.selected_mission_id.is_empty():
@@ -224,6 +229,22 @@ func _build_scene() -> void:
 	_hud.upgrade_selected.connect(_on_upgrade_selected)
 	_hud.init_minimap(_player, _enemies, _friendlies, BASE_POS, MAP_W, MAP_H)
 	_hud.set_crates_node(_crates)
+
+	_skill_tree = FortressSkillTree.new()
+	_skill_tree.upgrade_bought.connect(_apply_meta_upgrades)
+	add_child(_skill_tree)
+
+	_ammo_station = FortressAmmoStation.new()
+	_ammo_station.biomasa_spent.connect(_on_ammo_biomasa_spent)
+	_ammo_station.grenade_added.connect(
+		func(n: int): _grenade_count += n; _hud.update_grenade(_grenade_count, _grenade_mode))
+	_ammo_station.bomb_added.connect(
+		func(n: int): _bomb_count += n)
+	_ammo_station.sniper_ammo_added.connect(
+		func(n: int): if is_instance_valid(_player): _player.add_sniper_ammo(n))
+	_ammo_station.flame_fuel_added.connect(
+		func(n: int): if is_instance_valid(_player): _player.add_flame_fuel(n))
+	add_child(_ammo_station)
 
 	_camera = Camera2D.new()
 	_camera.position                = BASE_POS
@@ -404,6 +425,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				else:
 					_toggle_pause()
 			KEY_F:
+				_try_interact_fortress()
 				_try_revive_nearby()
 				_try_interact_mission_object()
 			KEY_Q:
@@ -835,6 +857,23 @@ func _on_burrow_enemy_spawned(e: Node) -> void:
 	e.died.connect(_on_enemy_died)
 	_enemies.add_child(e)
 
+const FORTRESS_INTERACT_R := 80.0
+
+func _try_interact_fortress() -> void:
+	if _game_over or not is_instance_valid(_player) or not is_instance_valid(_fortress):
+		return
+	var pp := _player.global_position
+	if pp.distance_to(_fortress.get_core_pos()) <= FORTRESS_INTERACT_R:
+		_skill_tree.open()
+		return
+	if pp.distance_to(_fortress.get_east_arm_mid()) <= FORTRESS_INTERACT_R:
+		_ammo_station.open(_biomasa)
+
+func _on_ammo_biomasa_spent(amount: int) -> void:
+	_biomasa = maxi(0, _biomasa - amount)
+	_hud.update_biomasa(_biomasa)
+	_ammo_station.refresh_biomasa(_biomasa)
+
 func _try_interact_mission_object() -> void:
 	if not is_instance_valid(_player) or not _mission_active:
 		return
@@ -906,6 +945,13 @@ func _physics_process(delta: float) -> void:
 	_tick_mission(delta)
 	_tick_regen(delta)
 	_tick_events(delta)
+	_tick_fortress_hints()
+
+func _tick_fortress_hints() -> void:
+	if not is_instance_valid(_fortress) or not is_instance_valid(_player):
+		return
+	_fortress.player_pos       = _player.global_position
+	_fortress.show_zone_hints  = not _game_over and not is_instance_valid(_title_ol)
 
 func _tick_camera() -> void:
 	if _game_over:
