@@ -414,8 +414,8 @@ func _switch_stage(stage_id: String) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	var positions   := _STAGE_POSITIONS[_current_stage_id]
-	var connections := _STAGE_CONNECTIONS[_current_stage_id]
+	var positions:   Dictionary = _STAGE_POSITIONS[_current_stage_id]
+	var connections: Array     = _STAGE_CONNECTIONS[_current_stage_id]
 	for pair in connections:
 		var a: Vector2 = positions[pair[0]]
 		var b: Vector2 = positions[pair[1]]
