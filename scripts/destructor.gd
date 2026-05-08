@@ -147,5 +147,5 @@ func _draw_body() -> void:
 
 	# Aura naranja cuando tiene objetivo estructural
 	if is_instance_valid(_siege_target):
-		var ap := 0.22 + 0.18 * abs(sin(_aura_t * 4.5))
+		var ap: float = 0.22 + 0.18 * absf(sin(_aura_t * 4.5))
 		draw_arc(Vector2.ZERO, r + 7.0, 0, TAU, 28, Color(1.0, 0.52, 0.0, ap), 3.0)

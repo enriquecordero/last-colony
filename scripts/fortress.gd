@@ -584,7 +584,7 @@ func _draw_core(c: Vector2) -> void:
 		pulse_speed = 1.8
 		ring_speed  = 0.35
 	elif upgrade_available:
-		var p := 0.70 + 0.30 * abs(sin(_pulse_t * 5.5))
+		var p: float = 0.70 + 0.30 * absf(sin(_pulse_t * 5.5))
 		core_col    = Color(1.0, 0.72, 0.0) * Color(p, p, p)
 		pulse_speed = 5.5
 		ring_speed  = 1.6
@@ -611,7 +611,7 @@ func _draw_core(c: Vector2) -> void:
 
 	# Upgrade-available indicator: pulsing diamond above core
 	if upgrade_available and not upgrades_maxed:
-		var dia_pulse := 0.55 + 0.45 * abs(sin(_pulse_t * 5.5))
+		var dia_pulse: float = 0.55 + 0.45 * absf(sin(_pulse_t * 5.5))
 		var dy := -CORE_R - 18.0
 		var d  := 6.0
 		var pts := PackedVector2Array([
@@ -735,12 +735,12 @@ func _draw_damage_overlays(c: Vector2) -> void:
 	# Low-HP warning: pulsing red hazard ring when base_hp_pct < 0.5
 	if base_hp_pct < 0.5:
 		var danger := 1.0 - base_hp_pct * 2.0   # 0 at 50%, 1 at 0%
-		var pulse_a := danger * (0.18 + 0.12 * abs(sin(_pulse_t * 6.0)))
+		var pulse_a: float = danger * (0.18 + 0.12 * absf(sin(_pulse_t * 6.0)))
 		draw_circle(c, OCT_RADIUS * 0.85,
 			Color(0.95, 0.10, 0.05, pulse_a))
 		# Critical text when very low
 		if base_hp_pct < 0.25:
-			var txt_a := 0.55 + 0.45 * abs(sin(_pulse_t * 8.0))
+			var txt_a: float = 0.55 + 0.45 * absf(sin(_pulse_t * 8.0))
 			draw_string(ThemeDB.fallback_font, c + Vector2(-36.0, 6.0),
 				"¡BASE CRÍTICA!",
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
