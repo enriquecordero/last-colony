@@ -87,8 +87,10 @@ var _apo: float   # OCT_RADIUS * cos(22.5°) ≈ 110.87
 var _fort_walls: Array = []
 var _pulse_t: float = 0.0
 
-var show_zone_hints: bool  = false
-var player_pos:     Vector2 = Vector2.ZERO
+var show_zone_hints:  bool    = false
+var player_pos:       Vector2 = Vector2.ZERO
+var upgrade_available: bool   = false
+var upgrades_maxed:    bool   = false
 
 
 func _ready() -> void:
@@ -319,6 +321,9 @@ func _draw() -> void:
 	# 4) Arm wall lines
 	_draw_arm_walls()
 
+	# 4b) Arm interior identity
+	_draw_arm_interiors()
+
 	# 5) Gates
 	_draw_gates()
 
@@ -381,6 +386,81 @@ func _draw_arm_walls() -> void:
 	draw_line(w_bl, w_br, COL_WALL_EDGE, 4.0)
 	draw_line(w_tl, w_tl + Vector2(0,  8),  COL_WALL_EDGE, 4.0)
 	draw_line(w_bl, w_bl + Vector2(0, -8),  COL_WALL_EDGE, 4.0)
+
+
+func _draw_arm_interiors() -> void:
+	var f  := ThemeDB.fallback_font
+	var gp := global_position
+
+	# ── East arm: Armería ────────────────────────────────────────────────────
+	var ex  := _apo + ARM_LEN * 0.5   # local x center of east arm
+	var ey  := 0.0
+
+	# Floor label
+	draw_string(f, Vector2(ex - 26.0, ey + 22.0), "ARMERÍA",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.50, 0.38, 0.12, 0.55))
+
+	# Ammo crate
+	var cr := Vector2(ex, ey - 6.0)
+	draw_rect(Rect2(cr + Vector2(-13, -9), Vector2(26, 18)), Color(0.22, 0.17, 0.08))
+	draw_rect(Rect2(cr + Vector2(-13, -9), Vector2(26, 18)), Color(0.68, 0.52, 0.18), false, 1.5)
+	draw_line(cr + Vector2(-13, 0), cr + Vector2(13,  0), Color(0.68, 0.52, 0.18, 0.60), 1.0)
+	draw_line(cr + Vector2(  0, -9), cr + Vector2( 0,  9), Color(0.68, 0.52, 0.18, 0.60), 1.0)
+	draw_rect(Rect2(cr + Vector2(-3, -3), Vector2(6, 6)), Color(0.50, 0.38, 0.12))
+	draw_rect(Rect2(cr + Vector2(-3, -3), Vector2(6, 6)), Color(0.80, 0.62, 0.22), false, 1.0)
+	# Bullet tips on top of crate
+	for i in 3:
+		var bx := cr.x - 6.0 + float(i) * 6.0
+		draw_rect(Rect2(Vector2(bx - 1.5, cr.y - 14.0), Vector2(3.0, 6.0)),
+			Color(0.68, 0.52, 0.18))
+		draw_circle(Vector2(bx, cr.y - 14.0), 1.8, Color(0.88, 0.72, 0.30))
+
+	# Weapon rack on the arm wall (top side, y offset -20)
+	var rack_y := ey - 20.0
+	draw_line(Vector2(ex - 16.0, rack_y), Vector2(ex + 16.0, rack_y),
+		Color(0.38, 0.32, 0.20, 0.70), 2.0)
+	for i in 3:
+		var rx := ex - 11.0 + float(i) * 11.0
+		draw_line(Vector2(rx, rack_y), Vector2(rx - 4.0, rack_y + 10.0),
+			Color(0.58, 0.50, 0.30, 0.65), 1.5)
+		draw_circle(Vector2(rx, rack_y - 1.5), 2.0, Color(0.45, 0.38, 0.22, 0.70))
+
+	# ── North arm: danger markings (enemy entry) ─────────────────────────────
+	var ny := -_apo - ARM_LEN * 0.5   # local y center of north arm
+	var nx := 0.0
+
+	# Hazard stripes
+	var stripe_col := Color(0.72, 0.55, 0.0, 0.28)
+	for i in 3:
+		var sy: float = ny - 12.0 + float(i) * 12.0
+		var sp := PackedVector2Array([
+			Vector2(nx - 22.0, sy),
+			Vector2(nx + 8.0,  sy),
+			Vector2(nx + 4.0,  sy + 8.0),
+			Vector2(nx - 26.0, sy + 8.0),
+		])
+		draw_colored_polygon(sp, stripe_col)
+
+	# "PELIGRO" floor text
+	draw_string(f, Vector2(nx - 21.0, ny + 26.0), "PELIGRO",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.72, 0.55, 0.0, 0.45))
+
+	# ── West arm: generator / power label ────────────────────────────────────
+	var wx := -_apo - ARM_LEN * 0.5
+	draw_string(f, Vector2(wx - 20.0, 14.0), "GENERADOR",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.0, 0.83, 1.0, 0.40))
+	# Small power bolt
+	var bolt := PackedVector2Array([
+		Vector2(wx + 4.0,  -14.0),
+		Vector2(wx - 2.0,  -2.0),
+		Vector2(wx + 2.0,  -2.0),
+		Vector2(wx - 4.0,   10.0),
+		Vector2(wx + 3.0,   0.0),
+		Vector2(wx - 1.0,   0.0),
+	])
+	draw_colored_polygon(bolt, Color(0.0, 0.83, 1.0, 0.45))
+
+	var _ := gp  # suppress unused warning
 
 
 func _draw_gates() -> void:
@@ -484,21 +564,52 @@ func _draw_dashed_rect(r: Rect2, color: Color, dash: float, gap: float) -> void:
 
 
 func _draw_core(c: Vector2) -> void:
-	var pulse: float = 0.85 + 0.15 * sin(_pulse_t * 3.0)
+	var core_col: Color
+	var pulse_speed: float
+	var ring_speed:  float
+	if upgrades_maxed:
+		var p := 0.80 + 0.20 * sin(_pulse_t * 1.8)
+		core_col    = Color(0.75, 0.90, 1.0) * Color(p, p, p)
+		pulse_speed = 1.8
+		ring_speed  = 0.35
+	elif upgrade_available:
+		var p := 0.70 + 0.30 * abs(sin(_pulse_t * 5.5))
+		core_col    = Color(1.0, 0.72, 0.0) * Color(p, p, p)
+		pulse_speed = 5.5
+		ring_speed  = 1.6
+	else:
+		var p := 0.85 + 0.15 * sin(_pulse_t * 3.0)
+		core_col    = COL_CORE_OUTER * Color(p, p, p)
+		pulse_speed = 3.0
+		ring_speed  = 0.6
+
 	var oct: PackedVector2Array = PackedVector2Array()
 	for i in 8:
 		var a: float = deg_to_rad(22.5 + float(i) * 45.0)
 		oct.append(c + Vector2(cos(a), sin(a)) * 28.0)
 	draw_colored_polygon(oct, Color(0.04, 0.10, 0.16))
-	draw_polyline(oct + PackedVector2Array([oct[0]]), COL_CORE_OUTER, 2.0)
-	draw_circle(c, CORE_R, COL_CORE_OUTER * Color(pulse, pulse, pulse, 1.0))
+	draw_polyline(oct + PackedVector2Array([oct[0]]), core_col, 2.0)
+	draw_circle(c, CORE_R, core_col)
 	draw_circle(c, CORE_R * 0.55, COL_CORE_INNER * Color(1, 1, 1, 0.85))
 	draw_circle(c, CORE_R * 0.25, Color(1, 1, 1, 0.85))
 	var ring_r := CORE_R + 6.0
 	for i in 16:
-		var a0: float = (TAU / 16.0) * float(i) + _pulse_t * 0.6
+		var a0: float = (TAU / 16.0) * float(i) + _pulse_t * ring_speed
 		var a1: float = a0 + (TAU / 32.0)
-		draw_arc(c, ring_r, a0, a1, 6, COL_CORE_OUTER * Color(1, 1, 1, 0.7), 1.0)
+		draw_arc(c, ring_r, a0, a1, 6, core_col * Color(1, 1, 1, 0.7), 1.0)
+
+	# Upgrade-available indicator: pulsing diamond above core
+	if upgrade_available and not upgrades_maxed:
+		var dia_pulse := 0.55 + 0.45 * abs(sin(_pulse_t * 5.5))
+		var dy := -CORE_R - 18.0
+		var d  := 6.0
+		var pts := PackedVector2Array([
+			c + Vector2(0, dy - d), c + Vector2(d, dy),
+			c + Vector2(0, dy + d), c + Vector2(-d, dy),
+		])
+		draw_colored_polygon(pts, Color(1.0, 0.72, 0.0, dia_pulse))
+		draw_polyline(pts + PackedVector2Array([pts[0]]),
+			Color(1.0, 0.90, 0.40, dia_pulse), 1.2)
 
 
 func _draw_antennas() -> void:

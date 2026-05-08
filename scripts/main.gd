@@ -950,8 +950,20 @@ func _physics_process(delta: float) -> void:
 func _tick_fortress_hints() -> void:
 	if not is_instance_valid(_fortress) or not is_instance_valid(_player):
 		return
-	_fortress.player_pos       = _player.global_position
-	_fortress.show_zone_hints  = not _game_over and not is_instance_valid(_title_ol)
+	_fortress.player_pos      = _player.global_position
+	_fortress.show_zone_hints = not _game_over and not is_instance_valid(_title_ol)
+
+	var any_available := false
+	var all_maxed     := true
+	for key in StageManager.META_TREE:
+		var cost := StageManager.get_meta_cost(key)
+		if cost < 0:
+			continue   # this key is maxed
+		all_maxed = false
+		if StageManager.chatarra_banked >= cost:
+			any_available = true
+	_fortress.upgrade_available = any_available
+	_fortress.upgrades_maxed    = all_maxed
 
 func _tick_camera() -> void:
 	if _game_over:
