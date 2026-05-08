@@ -85,12 +85,14 @@ var slots:             Array = []
 
 var _apo: float   # OCT_RADIUS * cos(22.5°) ≈ 110.87
 var _fort_walls: Array = []
-var _pulse_t: float = 0.0
+var _pulse_t:  float = 0.0
+var _hit_t:    float = 0.0   # countdown: 1.0 → 0.0 on each hit
 
-var show_zone_hints:  bool    = false
-var player_pos:       Vector2 = Vector2.ZERO
-var upgrade_available: bool   = false
-var upgrades_maxed:    bool   = false
+var show_zone_hints:   bool    = false
+var player_pos:        Vector2 = Vector2.ZERO
+var upgrade_available: bool    = false
+var upgrades_maxed:    bool    = false
+var base_hp_pct:       float   = 1.0   # updated by main.gd each frame damage ticks
 
 
 func _ready() -> void:
@@ -103,7 +105,13 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_pulse_t += delta
+	if _hit_t > 0.0:
+		_hit_t = maxf(0.0, _hit_t - delta * 3.0)
 	queue_redraw()
+
+
+func on_damaged() -> void:
+	_hit_t = 1.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -352,6 +360,9 @@ func _draw() -> void:
 	# 13) Zone interaction hints
 	if show_zone_hints:
 		_draw_zone_hints()
+
+	# 14) Damage overlays
+	_draw_damage_overlays(c)
 
 
 func _draw_arm_walls() -> void:
@@ -706,6 +717,34 @@ func _draw_wall_damage() -> void:
 					Vector2(r.position.x + r.size.x * t0, r.position.y),
 					Vector2(r.position.x + r.size.x * t1, r.position.y + r.size.y),
 					cc, 1.5)
+
+
+func _draw_damage_overlays(c: Vector2) -> void:
+	# Hit flash — red veil over the octagon on each base hit
+	if _hit_t > 0.0:
+		var flash_a := _hit_t * 0.38
+		var oct := PackedVector2Array()
+		for i in 8:
+			var a: float = deg_to_rad(22.5 + float(i) * 45.0)
+			oct.append(c + Vector2(cos(a), sin(a)) * OCT_RADIUS)
+		draw_colored_polygon(oct, Color(1.0, 0.08, 0.08, flash_a))
+		# Red border pulse
+		draw_polyline(oct + PackedVector2Array([oct[0]]),
+			Color(1.0, 0.20, 0.10, _hit_t * 0.9), 4.0)
+
+	# Low-HP warning: pulsing red hazard ring when base_hp_pct < 0.5
+	if base_hp_pct < 0.5:
+		var danger := 1.0 - base_hp_pct * 2.0   # 0 at 50%, 1 at 0%
+		var pulse_a := danger * (0.18 + 0.12 * abs(sin(_pulse_t * 6.0)))
+		draw_circle(c, OCT_RADIUS * 0.85,
+			Color(0.95, 0.10, 0.05, pulse_a))
+		# Critical text when very low
+		if base_hp_pct < 0.25:
+			var txt_a := 0.55 + 0.45 * abs(sin(_pulse_t * 8.0))
+			draw_string(ThemeDB.fallback_font, c + Vector2(-36.0, 6.0),
+				"¡BASE CRÍTICA!",
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+				Color(1.0, 0.20, 0.10, txt_a))
 
 
 func _draw_zone_hints() -> void:

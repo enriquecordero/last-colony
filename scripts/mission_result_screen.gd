@@ -154,11 +154,13 @@ func _build() -> void:
 	extra_y += 10.0
 
 	# ── Button ────────────────────────────────────────────────────────────────
+	var btn_text := "VER CRÉDITOS" if is_finale else "VOLVER AL HUB"
+	var btn_w    := 220.0 if is_finale else 210.0
 	var btn := Button.new()
-	btn.text = "VOLVER AL HUB"
+	btn.text = btn_text
 	btn.add_theme_font_size_override("font_size", 20)
-	btn.size       = Vector2(210, 46)
-	btn.position   = Vector2((PW - 210) * 0.5, extra_y)
+	btn.size       = Vector2(btn_w, 46)
+	btn.position   = Vector2((PW - btn_w) * 0.5, extra_y)
 	btn.modulate.a = 0.0
 	btn.pressed.connect(_go_to_hub)
 	panel.add_child(btn)
@@ -195,15 +197,20 @@ func _build() -> void:
 
 
 func _go_to_hub() -> void:
-	var result  := StageManager.get_last_result()
-	var success := bool(result.get("success", false))
+	var result    := StageManager.get_last_result()
+	var success   := bool(result.get("success", false))
+	var reward_id := result.get("reward_id", "") as String
+	var is_finale := success and reward_id == "stage3_complete"
 	if success:
 		var chatarra := int(result.get("chatarra", 0))
 		if chatarra > 0:
 			StageManager.bank_chatarra(chatarra)
-	MusicPlayer.set_mode(MusicPlayer.Mode.MENU)
 	StageManager.selected_mission_id = ""
-	get_tree().change_scene_to_file("res://scenes/stage_select.tscn")
+	if is_finale:
+		get_tree().change_scene_to_file("res://scenes/credits.tscn")
+	else:
+		MusicPlayer.set_mode(MusicPlayer.Mode.MENU)
+		get_tree().change_scene_to_file("res://scenes/stage_select.tscn")
 
 
 func _reward_str(rid: String) -> String:

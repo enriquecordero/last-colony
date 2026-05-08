@@ -507,6 +507,9 @@ func _rpc_init_player2(client_peer_id: int) -> void:
 
 	# On the client: rewire HUD to the LOCAL player (Player2) and apply meta
 	if _player2.is_multiplayer_authority():
+		# Snap camera to player2 immediately so it doesn't pan from player1 spawn
+		_camera.position = _player2.global_position
+		_camera.reset_smoothing()
 		if _player.health_changed.is_connected(_on_hp_changed):
 			_player.health_changed.disconnect(_on_hp_changed)
 		_player2.health_changed.connect(_on_hp_changed)
@@ -940,11 +943,14 @@ func _on_boss_died(e: Node) -> void:
 	var boss_pos: Vector2 = e.global_position
 	_boss = null
 	_on_enemy_died(e)
-	for i in 3:
+	for i in 5:
 		var ef := BombEffect.new()
-		ef.position = boss_pos + Vector2(randf_range(-40, 40), randf_range(-40, 40))
+		ef.position = boss_pos + Vector2(randf_range(-60, 60), randf_range(-60, 60))
 		add_child(ef)
 	shake(30.0)
+	SoundManager.play("boss_death")
+	MusicPlayer.set_mode(MusicPlayer.Mode.BUILD)
+	_hud.show_npc_announcement("¡ENEMIGO ELIMINADO!", Color(0.30, 1.00, 0.42))
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
 		_mission_runtime.notify_boss_killed()
 
@@ -1143,9 +1149,13 @@ func _tick_base_damage(delta: float) -> void:
 		return
 	_base_hp = max(0, _base_hp - dmg)
 	_hud.update_base_hp(_base_hp)
-	_fortress.modulate = Color(1.5, 0.35, 0.35)
+	_fortress.modulate = Color(1.6, 0.28, 0.28)
+	_fortress.base_hp_pct = float(_base_hp) / 1000.0
+	_fortress.on_damaged()
 	var tw := create_tween()
-	tw.tween_property(_fortress, "modulate", Color.WHITE, 0.2)
+	tw.tween_property(_fortress, "modulate", Color.WHITE, 0.25)
+	shake(5.0 + (1.0 - float(_base_hp) / 1000.0) * 8.0)
+	SoundManager.play("damage")
 	if _base_hp == 0:
 		_on_base_destroyed()
 

@@ -536,10 +536,18 @@ func set_crates_node(node: Node2D) -> void:
 	_minimap.set_crates_node(node)
 
 func show_game_over(wave: int, kills: int, base_destroyed: bool = false) -> void:
-	_go_reason.text   = "¡BASE DESTRUIDA!" if base_destroyed else "SOLDADO CAÍDO"
-	_go_wave.text     = "Wave alcanzada: %d" % wave
-	_go_kills.text    = "Kills: %d"          % kills
-	_go_panel.visible = true
+	_go_reason.text     = "¡BASE DESTRUIDA!" if base_destroyed else "SOLDADO CAÍDO"
+	_go_wave.text       = "Wave alcanzada: %d" % wave
+	_go_kills.text      = "Kills: %d"          % kills
+	_go_panel.visible   = true
+	_go_panel.modulate  = Color(1, 1, 1, 0)
+	_go_panel.scale     = Vector2(0.7, 0.7)
+	_go_panel.pivot_offset = _go_panel.size * 0.5
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(_go_panel, "modulate:a", 1.0, 0.45)
+	tw.tween_property(_go_panel, "scale", Vector2.ONE, 0.40)\
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func set_infected(v: bool) -> void:
 	if not _infect_lbl:
