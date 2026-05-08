@@ -16,16 +16,22 @@ const ROLE_COLORS := {
 	"ASSAULT":  Color(0.25, 0.55, 0.95),
 	"MEDIC":    Color(0.20, 0.85, 0.45),
 	"ENGINEER": Color(0.95, 0.55, 0.15),
+	"SNIPER":   Color(0.55, 0.90, 1.00),
+	"DEMO":     Color(1.00, 0.55, 0.15),
 }
 const ROLE_ICONS := {
 	"ASSAULT":  "⚔",
 	"MEDIC":    "✚",
 	"ENGINEER": "⚙",
+	"SNIPER":   "◎",
+	"DEMO":     "✸",
 }
 const ROLE_NAMES := {
 	"ASSAULT":  "ASALTO",
 	"MEDIC":    "MEDICO",
 	"ENGINEER": "INGENIERO",
+	"SNIPER":   "FRANCOTIRADOR",
+	"DEMO":     "DEMOLICIONES",
 }
 
 var role: String = "ASSAULT"
@@ -36,6 +42,7 @@ var down_t: float = 0.0
 var player: Node2D
 var base_pos: Vector2 = Vector2.ZERO
 var post_pos: Vector2 = Vector2.ZERO   # posición de guardia asignada; Vector2.ZERO = sin puesto fijo
+var _retreating: bool = false
 
 var _sprite_tex: String  = ""
 var _sprite:     Sprite2D
@@ -59,6 +66,22 @@ func _physics_process(delta: float) -> void:
 			died.emit(self)
 			queue_free()
 		return
+
+	# Retreat when critically wounded — return to base until partially healed
+	if not _retreating and float(hp) < float(max_hp) * 0.20:
+		_retreating = true
+	elif _retreating and float(hp) >= float(max_hp) * 0.40:
+		_retreating = false
+
+	if _retreating and base_pos != Vector2.ZERO:
+		var to_base := base_pos - global_position
+		velocity = to_base.normalized() * 160.0 if to_base.length() > 35.0 else Vector2.ZERO
+		move_and_slide()
+		if _sprite and velocity.length() > 5.0:
+			_sprite.rotation = velocity.angle()
+		queue_redraw()
+		return
+
 	_act(delta)
 	move_and_slide()
 	if _sprite and velocity.length() > 5.0:
@@ -116,6 +139,10 @@ func _draw() -> void:
 			var w := RADIUS * 2.0
 			draw_rect(Rect2(-RADIUS, -RADIUS - 9, w, 3), Color(0.10, 0.0, 0.0, 0.85))
 			draw_rect(Rect2(-RADIUS, -RADIUS - 9, w * float(hp) / float(max_hp), 3), col)
+
+	# Retreat indicator
+	if _retreating and not down:
+		draw_arc(Vector2.ZERO, RADIUS + 3, 0, TAU, 24, Color(1.0, 0.55, 0.0, 0.80), 2.0)
 
 	# Ícono de rol arriba
 	var f := ThemeDB.fallback_font

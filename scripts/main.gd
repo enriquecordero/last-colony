@@ -35,9 +35,11 @@ const RuinsDecor      = preload("res://scripts/ruins_decor.gd")
 const Barricada       = preload("res://scripts/barricada.gd")
 const BarricadaPreview = preload("res://scripts/barricada_preview.gd")
 
-const NPCAssault  = preload("res://scripts/npc_assault.gd")
-const NPCMedic    = preload("res://scripts/npc_medic.gd")
-const NPCEngineer = preload("res://scripts/npc_engineer.gd")
+const NPCAssault        = preload("res://scripts/npc_assault.gd")
+const NPCMedic          = preload("res://scripts/npc_medic.gd")
+const NPCEngineer       = preload("res://scripts/npc_engineer.gd")
+const NPCFrancotirador  = preload("res://scripts/npc_francotirador.gd")
+const NPCDemoliciones   = preload("res://scripts/npc_demoliciones.gd")
 
 const VIEW_W   := 1280.0
 const VIEW_H   := 720.0
@@ -89,6 +91,8 @@ var _title_blink:     Tween
 var _assault_npc:  Node2D
 var _medic_npc:    Node2D
 var _engineer_npc: Node2D
+var _sniper_npc:   Node2D
+var _demo_npc:     Node2D
 
 var _wave:        int  = 0
 var _kills:       int  = 0
@@ -123,10 +127,11 @@ var _upg_fire:          int  = 0
 var _upg_armor:         int  = 0
 var _healed_this_phase: bool = false
 
-var _pause_layer: CanvasLayer = null
-var _paused:      bool        = false
-var _regen_t:     float       = 0.0
-var _event_cd:    float       = 70.0
+var _pause_layer:    CanvasLayer = null
+var _paused:         bool        = false
+var _regen_t:        float       = 0.0
+var _event_cd:       float       = 70.0
+var _game_elapsed:   float       = 0.0
 
 func _ready() -> void:
 	_build_scene()
@@ -860,6 +865,7 @@ func _on_mission_completed(chatarra: int, reward_id: String) -> void:
 		"reward_id": reward_id,
 		"waves":     _wave,
 		"kills":     _kills,
+		"time_sec":  int(_game_elapsed),
 	})
 	shake(12.0)
 	_hud.announce_wave(_wave, "MISIÓN COMPLETADA")
@@ -872,10 +878,11 @@ func _on_mission_failed(reason: String) -> void:
 	_game_over      = true
 	_mission_active = false
 	StageManager.set_last_result({
-		"success": false,
-		"reason":  reason,
-		"waves":   _wave,
-		"kills":   _kills,
+		"success":  false,
+		"reason":   reason,
+		"waves":    _wave,
+		"kills":    _kills,
+		"time_sec": int(_game_elapsed),
 	})
 	_player.set_physics_process(false)
 	_player.set_process_unhandled_input(false)
@@ -889,6 +896,8 @@ func _on_mission_failed(reason: String) -> void:
 # ── Physics ───────────────────────────────────────────────────────────────────
 
 func _physics_process(delta: float) -> void:
+	if _mission_active and not _game_over:
+		_game_elapsed += delta
 	_tick_camera()
 	_tick_base_damage(delta)
 	_tick_shake(delta)
@@ -1460,6 +1469,10 @@ func _check_npc_spawn() -> void:
 		if not is_instance_valid(_assault_npc):  _spawn_assault_npc()
 		if not is_instance_valid(_medic_npc):    _spawn_medic_npc()
 		if not is_instance_valid(_engineer_npc): _spawn_engineer_npc()
+	if _wave == 3:
+		if not is_instance_valid(_sniper_npc):   _spawn_sniper_npc()
+	if _wave == 5:
+		if not is_instance_valid(_demo_npc):     _spawn_demo_npc()
 
 func _npc_spawn_pos(offset_normal: Vector2) -> Vector2:
 	# APO ≈ 111 + ARM_LEN/2 = 60 → midpoint of arm corridor ≈ 170
@@ -1467,20 +1480,19 @@ func _npc_spawn_pos(offset_normal: Vector2) -> Vector2:
 
 func _spawn_assault_npc() -> void:
 	_assault_npc                  = NPCAssault.new()
-	_assault_npc.position         = _npc_spawn_pos(Vector2(1, 0))   # brazo Este
+	_assault_npc.position         = _npc_spawn_pos(Vector2(1, 0.25).normalized())
 	_assault_npc.player           = _player
 	_assault_npc.base_pos         = BASE_POS
+	_assault_npc.post_pos         = _npc_spawn_pos(Vector2(1, 0.25).normalized())
 	_assault_npc.bullet_container = _bullets
 	_assault_npc.enemies_node     = _enemies
-	if _is_survival():
-		_assault_npc.post_pos = _npc_spawn_pos(Vector2(1, 0))
 	_assault_npc.died.connect(_on_npc_died)
 	_friendlies.add_child(_assault_npc)
 	_hud.show_npc_announcement("ASALTO", Color(0.45, 0.75, 1.0))
 
 func _spawn_medic_npc() -> void:
 	_medic_npc                  = NPCMedic.new()
-	_medic_npc.position         = _npc_spawn_pos(Vector2(-1, 0))    # brazo Oeste
+	_medic_npc.position         = BASE_POS + Vector2(0, 35)
 	_medic_npc.player           = _player
 	_medic_npc.base_pos         = BASE_POS
 	_medic_npc.bullet_container = _bullets
@@ -1491,18 +1503,42 @@ func _spawn_medic_npc() -> void:
 
 func _spawn_engineer_npc() -> void:
 	_engineer_npc                  = NPCEngineer.new()
-	_engineer_npc.position         = _npc_spawn_pos(Vector2(0, -1))  # brazo Norte
+	_engineer_npc.position         = _npc_spawn_pos(Vector2(-0.25, -1).normalized())
 	_engineer_npc.player           = _player
 	_engineer_npc.base_pos         = BASE_POS
+	_engineer_npc.post_pos         = _npc_spawn_pos(Vector2(-0.25, -1).normalized())
 	_engineer_npc.bullet_container = _bullets
 	_engineer_npc.enemies_node     = _enemies
 	_engineer_npc.walls_node       = _walls
 	_engineer_npc.fortress         = _fortress
-	if _is_survival():
-		_engineer_npc.post_pos = _npc_spawn_pos(Vector2(0, -1))
 	_engineer_npc.died.connect(_on_npc_died)
 	_friendlies.add_child(_engineer_npc)
 	_hud.show_npc_announcement("INGENIERO", Color(1.0, 0.65, 0.20))
+
+func _spawn_sniper_npc() -> void:
+	_sniper_npc                  = NPCFrancotirador.new()
+	_sniper_npc.position         = _npc_spawn_pos(Vector2(-1, 0.25).normalized())
+	_sniper_npc.player           = _player
+	_sniper_npc.base_pos         = BASE_POS
+	_sniper_npc.post_pos         = _npc_spawn_pos(Vector2(-1, 0.25).normalized())
+	_sniper_npc.bullet_container = _bullets
+	_sniper_npc.enemies_node     = _enemies
+	_sniper_npc.died.connect(_on_npc_died)
+	_friendlies.add_child(_sniper_npc)
+	_hud.show_npc_announcement("FRANCOTIRADOR", Color(0.55, 0.90, 1.0))
+
+func _spawn_demo_npc() -> void:
+	_demo_npc                  = NPCDemoliciones.new()
+	_demo_npc.position         = _npc_spawn_pos(Vector2(0.5, 1.0).normalized())
+	_demo_npc.player           = _player
+	_demo_npc.base_pos         = BASE_POS
+	_demo_npc.post_pos         = _npc_spawn_pos(Vector2(0.5, 1.0).normalized())
+	_demo_npc.bullet_container = _bullets
+	_demo_npc.enemies_node     = _enemies
+	_demo_npc.walls_node       = _walls
+	_demo_npc.died.connect(_on_npc_died)
+	_friendlies.add_child(_demo_npc)
+	_hud.show_npc_announcement("DEMOLICIONES", Color(1.0, 0.55, 0.15))
 
 func _is_survival() -> bool:
 	return _mission_runtime != null and is_instance_valid(_mission_runtime) \
@@ -1510,12 +1546,11 @@ func _is_survival() -> bool:
 		and _mission_runtime.mission.type == _MissionData.MissionType.SURVIVAL
 
 func _on_npc_died(npc: Node) -> void:
-	if npc == _assault_npc:
-		_assault_npc = null
-	elif npc == _medic_npc:
-		_medic_npc = null
-	elif npc == _engineer_npc:
-		_engineer_npc = null
+	if npc == _assault_npc:   _assault_npc  = null
+	elif npc == _medic_npc:   _medic_npc    = null
+	elif npc == _engineer_npc: _engineer_npc = null
+	elif npc == _sniper_npc:  _sniper_npc   = null
+	elif npc == _demo_npc:    _demo_npc     = null
 
 func _on_build_card_selected(type: int) -> void:
 	if not _build_phase:
@@ -1751,10 +1786,13 @@ func _tick_events(delta: float) -> void:
 
 func _fire_random_event() -> void:
 	var r := randf()
-	if   r < 0.30: _event_horda()
-	elif r < 0.55: _event_kit()
-	elif r < 0.75: _event_interferencia()
-	else:          _event_frenesi()
+	if   r < 0.22: _event_horda()
+	elif r < 0.40: _event_kit()
+	elif r < 0.55: _event_interferencia()
+	elif r < 0.68: _event_frenesi()
+	elif r < 0.80: _event_lluvia_meteoros()
+	elif r < 0.90: _event_tormenta_acida()
+	else:          _event_infeccion_masiva()
 
 func _event_horda() -> void:
 	_hud.show_npc_announcement("¡REFUERZOS ENEMIGOS!", Color(1.0, 0.25, 0.2))
@@ -1802,3 +1840,56 @@ func _event_frenesi() -> void:
 	for e in _enemies.get_children():
 		if is_instance_valid(e) and e.get("speed") != null:
 			e.speed = float(e.speed) / 1.45
+
+func _event_lluvia_meteoros() -> void:
+	_hud.show_npc_announcement("¡LLUVIA DE METEOROS — A CUBIERTA!", Color(1.0, 0.55, 0.15))
+	shake(6.0)
+	var count := 5 + randi() % 4
+	for i in count:
+		await get_tree().create_timer(0.85 * i + randf_range(0.0, 0.4)).timeout
+		if not is_instance_valid(self) or not _mission_active:
+			return
+		var pos := Vector2(
+			randf_range(350.0, MAP_W - 350.0),
+			randf_range(350.0, MAP_H - 350.0))
+		_spawn_meteor(pos)
+
+func _spawn_meteor(pos: Vector2) -> void:
+	const METEOR_R   := 90.0
+	const METEOR_DMG := 55
+	for e in _enemies.get_children():
+		if is_instance_valid(e) and e.has_method("take_damage"):
+			if e.global_position.distance_to(pos) <= METEOR_R:
+				e.take_damage(METEOR_DMG)
+	if is_instance_valid(_player) and _player.global_position.distance_to(pos) <= METEOR_R * 0.6:
+		_player.take_damage(22)
+	var ef := BombEffect.new()
+	ef.position = pos
+	ef.max_r    = METEOR_R
+	ef.tint     = Color(0.95, 0.45, 0.10)
+	add_child(ef)
+	SoundManager.play("explode")
+	shake(7.0)
+
+func _event_tormenta_acida() -> void:
+	_hud.show_npc_announcement("¡TORMENTA ÁCIDA — VELOCIDAD REDUCIDA 15s!", Color(0.55, 0.88, 0.15))
+	if is_instance_valid(_player) and _player.has_method("set_acid_storm"):
+		_player.set_acid_storm(true)
+	await get_tree().create_timer(15.0).timeout
+	if not is_instance_valid(self):
+		return
+	if is_instance_valid(_player) and _player.has_method("set_acid_storm"):
+		_player.set_acid_storm(false)
+	_hud.show_npc_announcement("TORMENTA ÁCIDA DISIPADA", Color(0.55, 0.88, 0.15))
+
+func _event_infeccion_masiva() -> void:
+	_hud.show_npc_announcement("¡ESPORA BIOORGÁNICA — INFECCIÓN MASIVA 20s!", Color(0.65, 0.10, 0.90))
+	if is_instance_valid(_player) and not _player.serum \
+			and _player.has_method("force_infect"):
+		_player.force_infect(true)
+		await get_tree().create_timer(20.0).timeout
+		if not is_instance_valid(self):
+			return
+		if is_instance_valid(_player) and _player.infected:
+			_player.force_infect(false)
+			_hud.show_npc_announcement("INFECCIÓN NEUTRALIZADA", Color(0.30, 1.0, 0.55))

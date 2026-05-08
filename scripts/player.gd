@@ -12,7 +12,7 @@ signal rocket_fired(rocket: Node)
 const BULLET_SCENE = preload("res://scenes/bullet.tscn")
 const Rocket       = preload("res://scripts/rocket.gd")
 
-enum Weapon { RIFLE, SHOTGUN, ROCKET }
+enum Weapon { RIFLE, SHOTGUN, ROCKET, SNIPER, LANZALLAMAS }
 
 # ── Munición ──
 const RIFLE_MAG_SIZE      := 30
@@ -24,6 +24,11 @@ const SHOTGUN_RELOAD_TIME := 2.0
 const ROCKET_MAG_SIZE     := 1
 const ROCKET_MAX_RESERVE  := 4
 const ROCKET_RELOAD_TIME  := 0.6
+const SNIPER_MAG_SIZE     := 1
+const SNIPER_MAX_RESERVE  := 5
+const SNIPER_RELOAD_TIME  := 2.5
+const FLAME_MAG_SIZE      := 50
+const FLAME_RATE          := 0.085
 
 # ── Bonus por elevación ──
 # Nivel:    0      1      2      3
@@ -54,9 +59,13 @@ var _shotgun_mag:     int   = SHOTGUN_MAG_SIZE
 var _shotgun_reserve: int   = SHOTGUN_MAX_RESERVE
 var _rocket_mag:      int   = ROCKET_MAG_SIZE
 var _rocket_reserve:  int   = 0
+var _sniper_mag:      int   = SNIPER_MAG_SIZE
+var _sniper_reserve:  int   = SNIPER_MAX_RESERVE
+var _flame_fuel:      int   = FLAME_MAG_SIZE
 var _reloading:       bool  = false
 var _reload_t:        float = 0.0
 var _damage_mult:     float = 1.0
+var _acid_debuff:     float = 1.0
 
 # Elevación
 var _elevation_level: int     = 0
@@ -127,6 +136,7 @@ func _draw() -> void:
 			Weapon.RIFLE:   total = RIFLE_RELOAD_TIME
 			Weapon.SHOTGUN: total = SHOTGUN_RELOAD_TIME
 			Weapon.ROCKET:  total = ROCKET_RELOAD_TIME
+			Weapon.SNIPER:  total = SNIPER_RELOAD_TIME
 		var pct: float = clampf(1.0 - _reload_t / total, 0.0, 1.0)
 		draw_arc(Vector2.ZERO, 22, -PI / 2, -PI / 2 + TAU * pct, 32,
 			Color(1.0, 0.85, 0.2), 3.0)
@@ -174,8 +184,13 @@ func _physics_process(delta: float) -> void:
 				died.emit()
 
 	# Disparo
-	var rate := _shotgun_rate if _weapon == Weapon.SHOTGUN \
-		else (0.8 if _weapon == Weapon.ROCKET else _rifle_rate)
+	var rate: float
+	match _weapon:
+		Weapon.SHOTGUN:     rate = _shotgun_rate
+		Weapon.ROCKET:      rate = 0.8
+		Weapon.SNIPER:      rate = 0.1
+		Weapon.LANZALLAMAS: rate = FLAME_RATE
+		_:                  rate = _rifle_rate
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) \
 			and _fire_cd <= 0.0 and not building and not _reloading:
 		if _has_mag_ammo():
@@ -199,6 +214,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_3:
 				if _rocket_reserve > 0 or _rocket_mag > 0:
 					_set_weapon(Weapon.ROCKET)
+			KEY_4:
+				if not building:
+					_set_weapon(Weapon.SNIPER)
+			KEY_5:
+				if not building and _flame_fuel > 0:
+					_set_weapon(Weapon.LANZALLAMAS)
 			KEY_R:
 				if _can_reload():
 					_start_reload()
@@ -307,7 +328,7 @@ func _set_weapon(w: Weapon) -> void:
 		queue_redraw()
 	_weapon  = w
 	_fire_cd = 0.0
-	const NAMES := ["RIFLE", "ESCOPETA", "COHETES"]
+	const NAMES := ["RIFLE", "ESCOPETA", "COHETES", "SNIPER", "LANZALLAMAS"]
 	weapon_changed.emit(NAMES[w])
 	_emit_ammo()
 
@@ -318,7 +339,7 @@ func _move() -> void:
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  d.y += 1
 	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  d.x -= 1
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): d.x += 1
-	velocity = d.normalized() * _speed
+	velocity = d.normalized() * _speed * _acid_debuff
 
 
 func _shoot() -> void:
@@ -333,6 +354,11 @@ func _shoot() -> void:
 			_shoot_shotgun()
 		Weapon.ROCKET:
 			_shoot_rocket()
+		Weapon.SNIPER:
+			SoundManager.play("shoot")
+			_shoot_sniper()
+		Weapon.LANZALLAMAS:
+			_shoot_lanzallamas()
 
 
 func _shoot_rocket() -> void:
@@ -379,24 +405,58 @@ func _shoot_shotgun() -> void:
 		_start_reload()
 
 
+func _shoot_sniper() -> void:
+	var b := BULLET_SCENE.instantiate()
+	b.global_position = global_position
+	b.direction = (get_global_mouse_position() - global_position).normalized()
+	b.lifetime  = 4.5 * get_range_mult()
+	b.damage    = int(220 * get_damage_mult())
+	b.bcolor    = Color(0.80, 0.97, 1.0)
+	b.bradius   = 3.5
+	bullet_container.add_child(b)
+	_sniper_mag -= 1
+	_emit_ammo()
+	if _sniper_mag <= 0 and _sniper_reserve > 0:
+		_start_reload()
+
+
+func _shoot_lanzallamas() -> void:
+	var base_dir := (get_global_mouse_position() - global_position).normalized()
+	for _i in 2:
+		var b := BULLET_SCENE.instantiate()
+		b.global_position = global_position
+		b.direction = base_dir.rotated(randf_range(deg_to_rad(-18.0), deg_to_rad(18.0)))
+		b.lifetime  = 0.22 * get_range_mult()
+		b.damage    = int(10 * get_damage_mult())
+		b.bcolor    = Color(1.0, randf_range(0.20, 0.60), 0.02)
+		b.bradius   = randf_range(5.0, 9.0)
+		bullet_container.add_child(b)
+	_flame_fuel -= 1
+	_emit_ammo()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Munición
 # ─────────────────────────────────────────────────────────────────────────────
 
 func _has_mag_ammo() -> bool:
 	match _weapon:
-		Weapon.RIFLE:   return _rifle_mag > 0
-		Weapon.SHOTGUN: return _shotgun_mag > 0
-		Weapon.ROCKET:  return _rocket_mag > 0
+		Weapon.RIFLE:       return _rifle_mag > 0
+		Weapon.SHOTGUN:     return _shotgun_mag > 0
+		Weapon.ROCKET:      return _rocket_mag > 0
+		Weapon.SNIPER:      return _sniper_mag > 0
+		Weapon.LANZALLAMAS: return _flame_fuel > 0
 	return false
 
 func _can_reload() -> bool:
 	if _reloading:
 		return false
 	match _weapon:
-		Weapon.RIFLE:   return _rifle_mag < RIFLE_MAG_SIZE and _rifle_reserve > 0
-		Weapon.SHOTGUN: return _shotgun_mag < SHOTGUN_MAG_SIZE and _shotgun_reserve > 0
-		Weapon.ROCKET:  return _rocket_mag < ROCKET_MAG_SIZE and _rocket_reserve > 0
+		Weapon.RIFLE:       return _rifle_mag < RIFLE_MAG_SIZE and _rifle_reserve > 0
+		Weapon.SHOTGUN:     return _shotgun_mag < SHOTGUN_MAG_SIZE and _shotgun_reserve > 0
+		Weapon.ROCKET:      return _rocket_mag < ROCKET_MAG_SIZE and _rocket_reserve > 0
+		Weapon.SNIPER:      return _sniper_mag < SNIPER_MAG_SIZE and _sniper_reserve > 0
+		Weapon.LANZALLAMAS: return false
 	return false
 
 func _start_reload() -> void:
@@ -405,6 +465,7 @@ func _start_reload() -> void:
 		Weapon.RIFLE:   _reload_t = RIFLE_RELOAD_TIME
 		Weapon.SHOTGUN: _reload_t = SHOTGUN_RELOAD_TIME
 		Weapon.ROCKET:  _reload_t = ROCKET_RELOAD_TIME
+		Weapon.SNIPER:  _reload_t = SNIPER_RELOAD_TIME
 	queue_redraw()
 	_emit_ammo()
 
@@ -426,6 +487,11 @@ func _finish_reload() -> void:
 			var taken: int  = mini(needed, _rocket_reserve)
 			_rocket_mag     += taken
 			_rocket_reserve -= taken
+		Weapon.SNIPER:
+			var needed: int = SNIPER_MAG_SIZE - _sniper_mag
+			var taken: int  = mini(needed, _sniper_reserve)
+			_sniper_mag     += taken
+			_sniper_reserve -= taken
 	queue_redraw()
 	_emit_ammo()
 
@@ -440,6 +506,12 @@ func _emit_ammo() -> void:
 		Weapon.ROCKET:
 			ammo_changed.emit("COHETES", _rocket_mag, ROCKET_MAG_SIZE,
 				_rocket_reserve, ROCKET_MAX_RESERVE, _reloading)
+		Weapon.SNIPER:
+			ammo_changed.emit("SNIPER", _sniper_mag, SNIPER_MAG_SIZE,
+				_sniper_reserve, SNIPER_MAX_RESERVE, _reloading)
+		Weapon.LANZALLAMAS:
+			ammo_changed.emit("LANZALLAMAS", _flame_fuel, FLAME_MAG_SIZE,
+				0, FLAME_MAG_SIZE, false)
 
 func add_ammo(rifle_amt: int = 0, shotgun_amt: int = 0) -> void:
 	_rifle_reserve   = mini(_rifle_reserve   + rifle_amt,   RIFLE_MAX_RESERVE)
@@ -453,6 +525,8 @@ func add_rockets(n: int) -> void:
 func refill_ammo() -> void:
 	_rifle_reserve   = RIFLE_MAX_RESERVE
 	_shotgun_reserve = SHOTGUN_MAX_RESERVE
+	_sniper_reserve  = SNIPER_MAX_RESERVE
+	_flame_fuel      = FLAME_MAG_SIZE
 	if _rifle_mag < RIFLE_MAG_SIZE:
 		var n: int = mini(RIFLE_MAG_SIZE - _rifle_mag, _rifle_reserve)
 		_rifle_mag     += n
@@ -461,11 +535,22 @@ func refill_ammo() -> void:
 		var n: int = mini(SHOTGUN_MAG_SIZE - _shotgun_mag, _shotgun_reserve)
 		_shotgun_mag     += n
 		_shotgun_reserve -= n
+	if _sniper_mag < SNIPER_MAG_SIZE:
+		var n: int = mini(SNIPER_MAG_SIZE - _sniper_mag, _sniper_reserve)
+		_sniper_mag     += n
+		_sniper_reserve -= n
 	if _reloading:
 		_reloading = false
 		_reload_t  = 0.0
 		queue_redraw()
 	_emit_ammo()
+
+func set_acid_storm(active: bool) -> void:
+	_acid_debuff = 0.50 if active else 1.0
+
+func force_infect(v: bool) -> void:
+	infected = v
+	infection_changed.emit(v)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

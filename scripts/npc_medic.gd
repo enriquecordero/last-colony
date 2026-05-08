@@ -74,6 +74,10 @@ func _act(delta: float) -> void:
 	queue_redraw()
 
 func _find_heal_target() -> Node2D:
+	# 0) Player critically low — always top priority
+	if is_instance_valid(player):
+		if float(player.hp) < float(player.max_hp) * 0.28:
+			return player
 	# 1) Downed NPC
 	for a in get_tree().get_nodes_in_group("allies"):
 		if a == self:
