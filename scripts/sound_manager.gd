@@ -10,6 +10,8 @@ func _ready() -> void:
 	_add("wave2",   520.0, 260.0,  0.22,  0.35)
 	_add("explode",  55.0,  18.0,  0.45,  1.00)
 	_add("spawn",   310.0,  75.0,  0.20,  0.42)
+	_add("sniper",  3800.0, 280.0, 0.07,  0.80)
+	_add("flame",    180.0,  60.0, 0.06,  0.35)
 
 func play(key: String) -> void:
 	if _players.has(key):

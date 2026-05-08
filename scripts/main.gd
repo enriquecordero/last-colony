@@ -40,9 +40,10 @@ const NPCMedic          = preload("res://scripts/npc_medic.gd")
 const NPCEngineer       = preload("res://scripts/npc_engineer.gd")
 const NPCFrancotirador  = preload("res://scripts/npc_francotirador.gd")
 const NPCDemoliciones   = preload("res://scripts/npc_demoliciones.gd")
-const FortressSkillTree   = preload("res://scripts/fortress_skill_tree.gd")
-const FortressAmmoStation = preload("res://scripts/fortress_ammo_station.gd")
-const DESTRUCTOR_SCENE    = preload("res://scenes/destructor.tscn")
+const FortressSkillTree      = preload("res://scripts/fortress_skill_tree.gd")
+const FortressAmmoStation    = preload("res://scripts/fortress_ammo_station.gd")
+const FortressGeneratorStation = preload("res://scripts/fortress_generator_station.gd")
+const DESTRUCTOR_SCENE       = preload("res://scenes/destructor.tscn")
 
 const VIEW_W   := 1280.0
 const VIEW_H   := 720.0
@@ -136,8 +137,9 @@ var _regen_t:        float       = 0.0
 var _event_cd:       float       = 70.0
 var _game_elapsed:   float       = 0.0
 
-var _skill_tree:    CanvasLayer = null
-var _ammo_station:  CanvasLayer = null
+var _skill_tree:         CanvasLayer = null
+var _ammo_station:       CanvasLayer = null
+var _generator_station:  CanvasLayer = null
 
 func _ready() -> void:
 	_build_scene()
@@ -246,6 +248,11 @@ func _build_scene() -> void:
 	_ammo_station.flame_fuel_added.connect(
 		func(n: int): if is_instance_valid(_player): _player.add_flame_fuel(n))
 	add_child(_ammo_station)
+
+	_generator_station = FortressGeneratorStation.new()
+	_generator_station.biomasa_spent.connect(_on_generator_biomasa_spent)
+	_generator_station.station_activated.connect(_on_generator_activated)
+	add_child(_generator_station)
 
 	_camera = Camera2D.new()
 	_camera.position                = BASE_POS
@@ -949,11 +956,26 @@ func _try_interact_fortress() -> void:
 		return
 	if pp.distance_to(_fortress.get_east_arm_mid()) <= FORTRESS_INTERACT_R:
 		_ammo_station.open(_biomasa)
+		return
+	var mids := _fortress.get_arm_midpoints()
+	if pp.distance_to(mids["W"]) <= FORTRESS_INTERACT_R:
+		_generator_station.open(_biomasa, _fortress.has_station(Fortress.StationType.GENERATOR))
 
 func _on_ammo_biomasa_spent(amount: int) -> void:
 	_biomasa = maxi(0, _biomasa - amount)
 	_hud.update_biomasa(_biomasa)
 	_ammo_station.refresh_biomasa(_biomasa)
+
+func _on_generator_biomasa_spent(amount: int) -> void:
+	_biomasa = maxi(0, _biomasa - amount)
+	_hud.update_biomasa(_biomasa)
+	_generator_station.refresh_biomasa(_biomasa)
+	_ammo_station.refresh_biomasa(_biomasa)
+
+func _on_generator_activated() -> void:
+	if is_instance_valid(_fortress):
+		_fortress.build_station(Fortress.StationType.GENERATOR)
+		_hud.announce_wave(_wave, "GENERADOR ACTIVADO  — +15 ◈/OLEADA  +1 GRANADA/FASE")
 
 func _try_interact_mission_object() -> void:
 	if not is_instance_valid(_player) or not _mission_active:

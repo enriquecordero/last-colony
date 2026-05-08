@@ -355,9 +355,10 @@ func _shoot() -> void:
 		Weapon.ROCKET:
 			_shoot_rocket()
 		Weapon.SNIPER:
-			SoundManager.play("shoot")
+			SoundManager.play("sniper")
 			_shoot_sniper()
 		Weapon.LANZALLAMAS:
+			SoundManager.play("flame")
 			_shoot_lanzallamas()
 
 
