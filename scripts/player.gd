@@ -432,6 +432,7 @@ func _shoot_lanzallamas() -> void:
 		b.damage    = int(10 * get_damage_mult())
 		b.bcolor    = Color(1.0, randf_range(0.20, 0.60), 0.02)
 		b.bradius   = randf_range(5.0, 9.0)
+		b.is_flame  = true
 		bullet_container.add_child(b)
 	_flame_fuel -= 1
 	_emit_ammo()
