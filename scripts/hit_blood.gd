@@ -37,11 +37,13 @@ func _process(delta: float) -> void:
 		queue_free()
 		return
 
-	var drag := 1.0 - delta * 7.0
+	var drag: float = 1.0 - delta * 7.0
 	for d in _drops:
-		d["vel"] *= drag
-		d["pos"] += d["vel"] * delta
-		d["alpha"] = lerpf(1.0, 0.0, _t * _t)
+		var vel: Vector2 = d["vel"]
+		vel           *= drag
+		d["vel"]       = vel
+		d["pos"]       = (d["pos"] as Vector2) + vel * delta
+		d["alpha"]     = lerpf(1.0, 0.0, _t * _t)
 
 	queue_redraw()
 
@@ -56,16 +58,18 @@ func _draw() -> void:
 
 	# Droplets
 	for d in _drops:
-		var g: float = d["shade"]
-		var a: float = d["alpha"]
-		var r: float = d["r"] * lerpf(1.0, 0.3, _t)
-		draw_circle(d["pos"], r, Color(0.02, g, 0.05, a))
+		var g:   float   = d["shade"]
+		var a:   float   = d["alpha"]
+		var r:   float   = d["r"] * lerpf(1.0, 0.3, _t)
+		var pos: Vector2 = d["pos"]
+		draw_circle(pos, r, Color(0.02, g, 0.05, a))
 
 	# Short streak lines from center outward along each droplet
 	for d in _drops:
-		if d["vel"].length_squared() < 4.0:
+		var vel: Vector2 = d["vel"]
+		if vel.length_squared() < 4.0:
 			continue
-		var tip := d["pos"]
-		var tail := tip - d["vel"].normalized() * minf(d["vel"].length() * 0.06, 8.0)
-		var a: float = d["alpha"] * 0.6
+		var tip:  Vector2 = d["pos"]
+		var tail: Vector2 = tip - vel.normalized() * minf(vel.length() * 0.06, 8.0)
+		var a:    float   = d["alpha"] * 0.6
 		draw_line(tail, tip, Color(0.04, d["shade"] * 0.8, 0.06, a), 1.2)
