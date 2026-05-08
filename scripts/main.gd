@@ -6,6 +6,9 @@ const SALTADORA_SCENE = preload("res://scenes/saltadora.tscn")
 const BLINDADO_SCENE  = preload("res://scenes/blindado.tscn")
 const ESCUPIDOR_SCENE = preload("res://scenes/escupidor.tscn")
 const EXPLOSIVO_SCENE = preload("res://scenes/explosivo.tscn")
+const VOLADOR_SCENE   = preload("res://scenes/volador.tscn")
+const TANQUE_SCENE    = preload("res://scenes/tanque.tscn")
+const EXCAVADOR_SCENE = preload("res://scenes/excavador.tscn")
 const HUD_SCENE       = preload("res://scenes/hud.tscn")
 const WALL_SCENE      = preload("res://scenes/wall.tscn")
 const TURRET_SCENE    = preload("res://scenes/turret.tscn")
@@ -1351,13 +1354,17 @@ func _start_mission() -> void:
 				_spawn_boss()
 
 func _spawn_wave() -> void:
-	var is_survival: bool = _is_survival()
+	var is_survival: bool  = _is_survival()
+	var is_stage2:   bool  = StageManager.selected_mission_id.begins_with("stage2")
 
-	# SURVIVAL: overwhelm — necesitas torres, minas y NPCs para sobrevivir
 	var hp_mult:  float = 1.0 + (_wave - 1) * (0.55 if is_survival else 0.38)
 	var base_spd: float = (115.0 + (_wave - 1) * 25.0) if is_survival else (95.0 + (_wave - 1) * 20.0)
 	var count:    int   = (90 + _wave * 45) if is_survival else (34 + _wave * 14)
 	var interval: float = 0.055 if is_survival else 0.17
+	if is_stage2:
+		hp_mult  *= 1.35
+		base_spd *= 1.20
+		count     = int(count * 1.25)
 
 	_wave_total = count
 	_killed     = 0
@@ -1369,7 +1376,22 @@ func _spawn_wave() -> void:
 			return
 		var e: CharacterBody2D
 		var r := randf()
-		if is_survival:
+		if is_stage2:
+			if _wave >= 3 and r < 0.06:
+				e = TANQUE_SCENE.instantiate();     e.speed = base_spd * 0.30
+			elif r < 0.20:
+				e = VOLADOR_SCENE.instantiate();    e.speed = base_spd * 1.50
+			elif _wave >= 2 and r < 0.35:
+				e = EXCAVADOR_SCENE.instantiate();  e.speed = base_spd * 0.90
+			elif r < 0.48:
+				e = BLINDADO_SCENE.instantiate();   e.speed = base_spd * 0.55
+			elif r < 0.60:
+				e = ESCUPIDOR_SCENE.instantiate();  e.speed = base_spd * 0.85
+			elif r < 0.72:
+				e = SALTADORA_SCENE.instantiate();  e.speed = base_spd * 1.90
+			else:
+				e = LARVA_SCENE.instantiate();      e.speed = base_spd
+		elif is_survival:
 			if _wave >= 2 and r < 0.20:
 				e = BLINDADO_SCENE.instantiate();   e.speed = base_spd * 0.55
 			elif _wave >= 2 and r < 0.34:
@@ -1399,7 +1421,7 @@ func _spawn_wave() -> void:
 		if "fortress" in e:
 			e.fortress = _fortress
 		e.died.connect(_on_enemy_died)
-		e.position         = _pick_spawn_pos()
+		e.position = _pick_interior_spawn_pos() if e.get("is_excavador") else _pick_spawn_pos()
 		_enemies.add_child(e)
 
 func _tick_mission(_delta: float) -> void:
@@ -1521,6 +1543,15 @@ func _on_upgrade_selected(type: int) -> void:
 		3: _try_heal()
 
 # ── Spawn ─────────────────────────────────────────────────────────────────────
+
+func _pick_interior_spawn_pos() -> Vector2:
+	for _i in 25:
+		var pos := Vector2(
+			randf_range(250.0, MAP_W - 250.0),
+			randf_range(250.0, MAP_H - 250.0))
+		if pos.distance_to(BASE_POS) > 350.0:
+			return pos
+	return BASE_POS + Vector2(randf_range(-700, 700), randf_range(-700, 700))
 
 func _pick_spawn_pos() -> Vector2:
 	var keys := SPAWN_POINTS.keys()

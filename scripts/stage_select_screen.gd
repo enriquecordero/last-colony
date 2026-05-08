@@ -7,21 +7,39 @@ const VIEW_H  := 720.0
 const CARD_W  := 240.0
 const CARD_H  := 112.0
 
-const _POSITIONS: Dictionary = {
-	"stage1_recon":         Vector2(640, 145),
-	"stage1_satellite":     Vector2(370, 292),
-	"stage1_research":      Vector2(910, 292),
-	"stage1_extermination": Vector2(640, 440),
-	"stage1_engendro":      Vector2(640, 575),
+const _STAGE_POSITIONS: Dictionary = {
+	"stage1": {
+		"stage1_recon":         Vector2(640, 145),
+		"stage1_satellite":     Vector2(370, 292),
+		"stage1_research":      Vector2(910, 292),
+		"stage1_extermination": Vector2(640, 440),
+		"stage1_engendro":      Vector2(640, 575),
+	},
+	"stage2": {
+		"stage2_advance":       Vector2(640, 145),
+		"stage2_infiltration":  Vector2(370, 292),
+		"stage2_extermination": Vector2(910, 292),
+		"stage2_siege":         Vector2(640, 440),
+		"stage2_queen":         Vector2(640, 575),
+	},
 }
 
-const _CONNECTIONS: Array = [
-	["stage1_recon",         "stage1_satellite"],
-	["stage1_recon",         "stage1_research"],
-	["stage1_satellite",     "stage1_extermination"],
-	["stage1_research",      "stage1_extermination"],
-	["stage1_extermination", "stage1_engendro"],
-]
+const _STAGE_CONNECTIONS: Dictionary = {
+	"stage1": [
+		["stage1_recon",         "stage1_satellite"],
+		["stage1_recon",         "stage1_research"],
+		["stage1_satellite",     "stage1_extermination"],
+		["stage1_research",      "stage1_extermination"],
+		["stage1_extermination", "stage1_engendro"],
+	],
+	"stage2": [
+		["stage2_advance",       "stage2_infiltration"],
+		["stage2_advance",       "stage2_extermination"],
+		["stage2_infiltration",  "stage2_siege"],
+		["stage2_extermination", "stage2_siege"],
+		["stage2_siege",         "stage2_queen"],
+	],
+}
 
 const COL_AVAILABLE := Color(0.25, 0.82, 0.42)
 const COL_COMPLETED := Color(0.30, 0.75, 1.00)
@@ -29,6 +47,7 @@ const COL_LOCKED    := Color(0.35, 0.35, 0.40)
 const COL_SURVIVAL  := Color(0.95, 0.40, 0.20)
 const COL_LINE      := Color(0.28, 0.42, 0.28, 0.65)
 
+var _current_stage_id: String     = "stage1"
 var _selected_id:      String     = ""
 var _survival_confirm: bool      = false
 var _card_panels:      Dictionary = {}
@@ -62,6 +81,24 @@ func _build() -> void:
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(sub)
 
+	# Stage nav
+	var s1_btn := Button.new()
+	s1_btn.text = "◄  STAGE 1"
+	s1_btn.add_theme_font_size_override("font_size", 14)
+	s1_btn.size     = Vector2(140, 30)
+	s1_btn.position = Vector2(20, 86)
+	s1_btn.pressed.connect(func() -> void: _switch_stage("stage1"))
+	add_child(s1_btn)
+
+	if StageManager.is_reward_unlocked("stage1_complete"):
+		var s2_btn := Button.new()
+		s2_btn.text = "STAGE 2  ►"
+		s2_btn.add_theme_font_size_override("font_size", 14)
+		s2_btn.size     = Vector2(140, 30)
+		s2_btn.position = Vector2(VIEW_W - 160, 86)
+		s2_btn.pressed.connect(func() -> void: _switch_stage("stage2"))
+		add_child(s2_btn)
+
 	# Chatarra banked display
 	_chatarra_lbl = _lbl("CHATARRA: %d" % StageManager.chatarra_banked, 16, Color(0.3, 0.95, 0.55))
 	_chatarra_lbl.size     = Vector2(220, 24)
@@ -87,7 +124,7 @@ func _build() -> void:
 	_coop_btn.pressed.connect(_on_coop_pressed)
 	add_child(_coop_btn)
 
-	var missions := StageRegistry.get_stage_missions("stage1")
+	var missions := StageRegistry.get_stage_missions(_current_stage_id)
 	for m in missions:
 		_build_card(m)
 
@@ -97,7 +134,7 @@ func _build() -> void:
 
 func _build_card(mission) -> void:
 	var status := StageManager.get_mission_status(mission.id)
-	var center: Vector2 = _POSITIONS[mission.id]
+	var center: Vector2 = _STAGE_POSITIONS[_current_stage_id][mission.id]
 	var col    := _status_color(status, mission.type)
 
 	var card         := Panel.new()
@@ -361,10 +398,27 @@ func _on_coop_pressed() -> void:
 	StageManager.selected_mission_id = _selected_id
 	get_tree().change_scene_to_file("res://scenes/lobby.tscn")
 
+func _switch_stage(stage_id: String) -> void:
+	if _current_stage_id == stage_id:
+		return
+	_current_stage_id = stage_id
+	_selected_id      = ""
+	_survival_confirm = false
+	for panel in _card_panels.values():
+		panel.queue_free()
+	_card_panels.clear()
+	_deploy_panel.visible = false
+	var missions := StageRegistry.get_stage_missions(_current_stage_id)
+	for m in missions:
+		_build_card(m)
+	queue_redraw()
+
 func _draw() -> void:
-	for pair in _CONNECTIONS:
-		var a: Vector2 = _POSITIONS[pair[0]]
-		var b: Vector2 = _POSITIONS[pair[1]]
+	var positions   := _STAGE_POSITIONS[_current_stage_id]
+	var connections := _STAGE_CONNECTIONS[_current_stage_id]
+	for pair in connections:
+		var a: Vector2 = positions[pair[0]]
+		var b: Vector2 = positions[pair[1]]
 		draw_line(a + Vector2(0, CARD_H * 0.5), b - Vector2(0, CARD_H * 0.5), COL_LINE, 2.0, true)
 
 func _status_color(status: String, type: int) -> Color:
