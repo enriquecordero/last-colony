@@ -7,9 +7,13 @@ func _ready() -> void:
 	_build()
 
 func _build() -> void:
-	var result  := StageManager.get_last_result()
-	var success := bool(result.get("success", false))
-	var col_main := Color(0.30, 1.00, 0.42) if success else Color(1.00, 0.32, 0.32)
+	var result    := StageManager.get_last_result()
+	var success   := bool(result.get("success", false))
+	var reward_id := result.get("reward_id", "") as String
+	var is_finale := success and reward_id == "stage3_complete"
+	var col_main  := Color(1.00, 0.85, 0.15) if is_finale \
+		else (Color(0.30, 1.00, 0.42) if success else Color(1.00, 0.32, 0.32))
+	MusicPlayer.set_mode(MusicPlayer.Mode.SILENT)
 
 	# ── Background ────────────────────────────────────────────────────────────
 	var bg := ColorRect.new()
@@ -31,7 +35,10 @@ func _build() -> void:
 	add_child(panel)
 
 	# Title
-	var title_lbl := _lbl("MISIÓN COMPLETADA" if success else "MISIÓN FALLIDA", 36, col_main)
+	var title_str := "◈  VICTORIA FINAL  ◈" if is_finale \
+		else ("MISIÓN COMPLETADA" if success else "MISIÓN FALLIDA")
+	var title_sz  := 42 if is_finale else 36
+	var title_lbl := _lbl(title_str, title_sz, col_main)
 	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_lbl.size         = Vector2(PW, 52)
 	title_lbl.position     = Vector2(0, 18)
@@ -122,7 +129,6 @@ func _build() -> void:
 		extra_nodes.append(klbl)
 		extra_y += 30.0
 
-	var reward_id: String = result.get("reward_id", "")
 	if success and reward_id != "":
 		var rlbl := _lbl("✦  " + _reward_str(reward_id) + "  ✦", 16, Color(0.88, 0.78, 0.28))
 		rlbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -195,6 +201,7 @@ func _go_to_hub() -> void:
 		var chatarra := int(result.get("chatarra", 0))
 		if chatarra > 0:
 			StageManager.bank_chatarra(chatarra)
+	MusicPlayer.set_mode(MusicPlayer.Mode.MENU)
 	StageManager.selected_mission_id = ""
 	get_tree().change_scene_to_file("res://scenes/stage_select.tscn")
 
@@ -204,7 +211,8 @@ func _reward_str(rid: String) -> String:
 		"full_minimap":    return "Mapa completo desbloqueado"
 		"antiserum":       return "Suero antiinfeccion desbloqueado"
 		"stage1_complete": return "Stage 2 desbloqueado"
-		"stage2_complete": return "¡Juego completado — Victoria!"
+		"stage2_complete": return "Stage 3 desbloqueado"
+		"stage3_complete": return "¡VICTORIA FINAL — LA COLONIA SOBREVIVIÓ!"
 		_:                 return rid
 
 func _reason_str(reason: String) -> String:

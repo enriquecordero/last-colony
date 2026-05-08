@@ -82,6 +82,7 @@ var _meta_card_lbls:   Dictionary = {}
 var _title_lbl:        Label      = null
 
 func _ready() -> void:
+	MusicPlayer.set_mode(MusicPlayer.Mode.MENU)
 	_build()
 
 func _build() -> void:

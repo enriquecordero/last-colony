@@ -46,6 +46,7 @@ const FortressGeneratorStation = preload("res://scripts/fortress_generator_stati
 const DESTRUCTOR_SCENE         = preload("res://scenes/destructor.tscn")
 const CORRUPTOR_SCENE          = preload("res://scenes/corruptor.tscn")
 const MenteColmena             = preload("res://scripts/mente_colmena.gd")
+const Reina                    = preload("res://scripts/reina.gd")
 const AcidPool                 = preload("res://scripts/acid_pool.gd")
 
 const VIEW_W   := 1280.0
@@ -898,7 +899,26 @@ func _spawn_boss() -> void:
 		_boss.phase2_entered.connect(_on_boss_phase2)
 		_boss.corrosive_pulse_emitted.connect(_on_boss_corrosive_pulse)
 		_enemies.add_child(_boss)
+		MusicPlayer.set_mode(MusicPlayer.Mode.BOSS)
 		_hud.show_npc_announcement("¡LA MENTE COLMENA DESPIERTA!", Color(0.85, 0.20, 1.0))
+	elif StageManager.selected_mission_id.begins_with("stage2"):
+		_boss                  = Reina.new()
+		_boss.position         = boss_pos
+		_boss.player           = _player
+		_boss.base_pos         = BASE_POS
+		_boss.bullet_container = _bullets
+		_boss.walls_node       = _walls
+		if "fortress" in _boss:
+			_boss.fortress = _fortress
+		if "_acid_node_parent" in _boss:
+			_boss._acid_node_parent = self
+		_boss.died.connect(_on_boss_died)
+		_boss.summoned_larva.connect(_on_boss_summoned_larva)
+		_boss.rugido_emitted.connect(_on_boss_rugido)
+		_boss.phase2_entered.connect(_on_boss_phase2)
+		_enemies.add_child(_boss)
+		MusicPlayer.set_mode(MusicPlayer.Mode.BOSS)
+		_hud.show_npc_announcement("¡LA REINA HA DESPERTADO!", Color(0.80, 0.15, 1.0))
 	else:
 		_boss                  = Engendro.new()
 		_boss.position         = boss_pos
@@ -913,6 +933,7 @@ func _spawn_boss() -> void:
 		_boss.rugido_emitted.connect(_on_boss_rugido)
 		_boss.phase2_entered.connect(_on_boss_phase2)
 		_enemies.add_child(_boss)
+		MusicPlayer.set_mode(MusicPlayer.Mode.BOSS)
 		_hud.show_npc_announcement("¡EL ENGENDRO HA LLEGADO!", Color(1.0, 0.25, 0.1))
 
 func _on_boss_died(e: Node) -> void:
@@ -1216,6 +1237,7 @@ func _start_build_phase() -> void:
 	var grenade_bonus := 1 if (is_instance_valid(_fortress) and _fortress.has_station(Fortress.StationType.GENERATOR)) else 0
 	_grenade_count      = mini(_grenade_count + 2 + grenade_bonus, 6)
 	_grenade_mode       = false
+	MusicPlayer.set_mode(MusicPlayer.Mode.BUILD)
 	_hud.show_build_phase(int(BUILD_PHASE_TIME))
 	_hud.show_upgrades(_upg_speed, _upg_fire, _upg_armor, _healed_this_phase, _biomasa)
 	_hud.update_grenade(_grenade_count, false)
@@ -1553,6 +1575,7 @@ func _start_mission() -> void:
 	else:
 		_hud.announce_wave(_wave, "OLEADA %d" % _wave)
 		_spawn_wave()
+	MusicPlayer.set_mode(MusicPlayer.Mode.WAVE)
 	if StageManager.is_multiplayer and multiplayer.is_server():
 		_rpc_wave_start.rpc(_wave)
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
@@ -1940,6 +1963,7 @@ func _on_player_died() -> void:
 	_game_over      = true
 	_mission_active = false
 	_bomb_count     = 0
+	MusicPlayer.set_mode(MusicPlayer.Mode.SILENT)
 	_set_build_mode(false)
 	_hud.hide_upgrades()
 	_hud.hide_build_phase()
@@ -1963,6 +1987,7 @@ func _on_base_destroyed() -> void:
 	_game_over      = true
 	_mission_active = false
 	_bomb_count     = 0
+	MusicPlayer.set_mode(MusicPlayer.Mode.SILENT)
 	_set_build_mode(false)
 	_hud.hide_upgrades()
 	_hud.hide_build_phase()

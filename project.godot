@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 SoundManager="*res://scripts/sound_manager.gd"
 StageManager="*res://scripts/stage_manager.gd"
 StageRegistry="*res://scripts/stage_registry.gd"
+MusicPlayer="*res://scripts/music_player.gd"
 
 [display]
 
