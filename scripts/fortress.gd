@@ -803,6 +803,13 @@ func get_door_centers() -> Dictionary:
 func get_east_arm_mid() -> Vector2:
 	return hex_center + Vector2(_apo + ARM_LEN * 0.5, 0.0)
 
+func get_arm_midpoints() -> Dictionary:
+	return {
+		"N": hex_center + Vector2(0.0,                    -_apo - ARM_LEN * 0.5),
+		"E": hex_center + Vector2(_apo  + ARM_LEN * 0.5,  0.0),
+		"W": hex_center + Vector2(-_apo - ARM_LEN * 0.5,  0.0),
+	}
+
 
 func get_level_bounds(level: int, _pos: Vector2) -> Rect2:
 	match level:

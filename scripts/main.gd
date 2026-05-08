@@ -40,8 +40,9 @@ const NPCMedic          = preload("res://scripts/npc_medic.gd")
 const NPCEngineer       = preload("res://scripts/npc_engineer.gd")
 const NPCFrancotirador  = preload("res://scripts/npc_francotirador.gd")
 const NPCDemoliciones   = preload("res://scripts/npc_demoliciones.gd")
-const FortressSkillTree  = preload("res://scripts/fortress_skill_tree.gd")
+const FortressSkillTree   = preload("res://scripts/fortress_skill_tree.gd")
 const FortressAmmoStation = preload("res://scripts/fortress_ammo_station.gd")
+const DESTRUCTOR_SCENE    = preload("res://scenes/destructor.tscn")
 
 const VIEW_W   := 1280.0
 const VIEW_H   := 720.0
@@ -461,6 +462,7 @@ func _start_game() -> void:
 	if _player.has_signal("rocket_fired"):
 		_player.rocket_fired.connect(_on_rocket_fired)
 	_apply_meta_upgrades()
+	_spawn_fortress_turrets()
 
 	if StageManager.is_multiplayer:
 		_init_multiplayer_players()
@@ -522,6 +524,29 @@ func _setup_mission_runtime() -> void:
 	_mission_runtime.completed.connect(_on_mission_completed)
 	_mission_runtime.failed.connect(_on_mission_failed)
 	_mission_runtime.start()
+
+func _spawn_fortress_turrets() -> void:
+	if not is_instance_valid(_fortress):
+		return
+	# Fortress off-map for incursion missions — skip
+	if _fortress.get_core_pos().distance_to(BASE_POS) > 500.0:
+		return
+	var mids: Dictionary = _fortress.get_arm_midpoints()
+	# Two flanking turrets in the N arm (main enemy entry)
+	var n_mid: Vector2 = mids["N"]
+	for offset in [Vector2(-20, 0), Vector2(20, 0)]:
+		_place_fort_turret(n_mid + offset)
+	# One covering turret in the W arm
+	_place_fort_turret(mids["W"])
+
+func _place_fort_turret(pos: Vector2) -> void:
+	var t := TURRET_SCENE.instantiate()
+	t.position         = pos
+	t.hp               = 250
+	t.max_hp           = 250
+	t.bullet_container = _bullets
+	t.enemies_node     = _enemies
+	_walls.add_child(t)
 
 func _spawn_pre_populate(count: int) -> void:
 	if count <= 0:
@@ -1490,6 +1515,38 @@ func _spawn_wave() -> void:
 		e.died.connect(_on_enemy_died)
 		e.position = _pick_interior_spawn_pos() if e.get("is_excavador") else _pick_spawn_pos()
 		_enemies.add_child(e)
+
+	# Destructores — spawnean separados del conteo normal, oleada 3+
+	var destructor_count := 0
+	if is_stage2 and _wave >= 2:
+		destructor_count = mini(_wave - 1, 4)
+	elif is_survival and _wave >= 3:
+		destructor_count = mini(_wave - 2, 3)
+	elif _wave >= 3:
+		destructor_count = mini(_wave - 2, 2)
+
+	for _di in destructor_count:
+		await get_tree().create_timer(randf_range(0.5, 2.5)).timeout
+		if not _mission_active or not is_instance_valid(self):
+			return
+		_spawn_destructor(hp_mult)
+
+func _spawn_destructor(hp_mult: float) -> void:
+	var d := DESTRUCTOR_SCENE.instantiate()
+	d.max_hp           = int(float(d.max_hp) * hp_mult)
+	d.hp               = d.max_hp
+	d.player           = _player
+	d.base_pos         = BASE_POS
+	d.bullet_container = _bullets
+	if "fortress" in d:
+		d.fortress = _fortress
+	if "walls_node" in d:
+		d.walls_node = _walls
+	d.died.connect(_on_enemy_died)
+	d.position = _pick_spawn_pos()
+	_enemies.add_child(d)
+	_wave_total += 1
+	_hud.update_enemy_progress(_killed, _wave_total)
 
 func _tick_mission(_delta: float) -> void:
 	if not _mission_active or _game_over:
