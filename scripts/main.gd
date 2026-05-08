@@ -969,7 +969,7 @@ func _on_boss_rugido() -> void:
 func _on_boss_phase2() -> void:
 	shake(18.0)
 	if StageManager.selected_mission_id.begins_with("stage3"):
-		var phase := _boss.get("_phase") if is_instance_valid(_boss) else 2
+		var phase: int = int(_boss.get("_phase")) if is_instance_valid(_boss) else 2
 		if phase == 3:
 			_hud.show_npc_announcement("¡MENTE COLMENA — FASE 3! PULSO CORROSIVO CONSTANTE", Color(1.0, 0.15, 0.45))
 		else:
@@ -1016,7 +1016,7 @@ func _try_interact_fortress() -> void:
 	if pp.distance_to(_fortress.get_east_arm_mid()) <= FORTRESS_INTERACT_R:
 		_ammo_station.open(_biomasa)
 		return
-	var mids := _fortress.get_arm_midpoints()
+	var mids: Dictionary = _fortress.get_arm_midpoints()
 	if pp.distance_to(mids["W"]) <= FORTRESS_INTERACT_R:
 		_generator_station.open(_biomasa, _fortress.has_station(Fortress.StationType.GENERATOR))
 
