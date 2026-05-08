@@ -482,9 +482,9 @@ func _init_multiplayer_players() -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_init_player2(client_peer_id: int) -> void:
-	_player2          = PLAYER_SCENE.instantiate()
-	_player2.name     = "Player2"
-	_player2.position = BASE_POS + Vector2(60, 0)
+	_player2                  = PLAYER_SCENE.instantiate()
+	_player2.name             = "Player2"
+	_player2.position         = BASE_POS + Vector2(60, 0)
 	_player2.bullet_container = _bullets
 	if "fortress" in _player2:
 		_player2.fortress = _fortress
@@ -493,6 +493,62 @@ func _rpc_init_player2(client_peer_id: int) -> void:
 	_player2.set_physics_process(true)
 	_player2.set_process_unhandled_input(true)
 	add_child(_player2)
+
+	# On the client: rewire HUD to the LOCAL player (Player2) and apply meta
+	if _player2.is_multiplayer_authority():
+		if _player.health_changed.is_connected(_on_hp_changed):
+			_player.health_changed.disconnect(_on_hp_changed)
+		_player2.health_changed.connect(_on_hp_changed)
+		_player2.weapon_changed.connect(_hud.update_weapon)
+		_player2.ammo_changed.connect(_hud.update_ammo)
+		if _player2.has_signal("infection_changed"):
+			_player2.infection_changed.connect(_on_infection_changed)
+		if _player2.has_signal("elevation_changed"):
+			_player2.elevation_changed.connect(_on_player_elevation_changed)
+		if _player2.has_signal("stair_state_changed"):
+			_player2.stair_state_changed.connect(_on_stair_state_changed)
+		if _player2.has_signal("rocket_fired"):
+			_player2.rocket_fired.connect(_on_rocket_fired)
+		_apply_meta_upgrades_for(_player2)
+		_hud.update_hp(_player2.hp)
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_wave_start(wave_num: int) -> void:
+	if multiplayer.get_unique_id() == 1:
+		return  # server already handled this locally
+	_wave          = wave_num
+	_mission_active = true
+	_hud.update_wave(_wave)
+	_hud.announce_wave(_wave, "OLEADA %d" % _wave)
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_build_phase_start(wave_num: int, grenade_count: int, biomasa: int,
+		upg_speed: int, upg_fire: int, upg_armor: int) -> void:
+	if multiplayer.get_unique_id() == 1:
+		return
+	_wave           = wave_num
+	_mission_active = false
+	_build_phase    = true
+	_grenade_count  = grenade_count
+	_biomasa        = biomasa
+	_upg_speed      = upg_speed
+	_upg_fire       = upg_fire
+	_upg_armor      = upg_armor
+	_hud.show_build_phase(int(BUILD_PHASE_TIME))
+	_hud.show_upgrades(_upg_speed, _upg_fire, _upg_armor, false, _biomasa)
+	_hud.update_grenade(_grenade_count, false)
+	_hud.update_biomasa(_biomasa)
+	if is_instance_valid(_player2):
+		_player2.refill_ammo()
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_wave_complete(reward: int) -> void:
+	if multiplayer.get_unique_id() == 1:
+		return
+	_biomasa += reward
+	_hud.update_biomasa(_biomasa)
+	_hud.update_enemy_progress(0, 0)
+	_hud.announce_wave(_wave, "OLEADA COMPLETADA  +%d CHATARRA" % reward)
 
 func _get_local_player() -> Node2D:
 	if StageManager.is_multiplayer and is_instance_valid(_player2) \
@@ -1109,6 +1165,9 @@ func _start_build_phase() -> void:
 	_hud.show_build_phase(int(BUILD_PHASE_TIME))
 	_hud.show_upgrades(_upg_speed, _upg_fire, _upg_armor, _healed_this_phase, _biomasa)
 	_hud.update_grenade(_grenade_count, false)
+	if StageManager.is_multiplayer and multiplayer.is_server():
+		_rpc_build_phase_start.rpc(_wave, _grenade_count, _biomasa,
+				_upg_speed, _upg_fire, _upg_armor)
 
 	if is_instance_valid(_player):
 		_player.refill_ammo()
@@ -1440,6 +1499,8 @@ func _start_mission() -> void:
 	else:
 		_hud.announce_wave(_wave, "OLEADA %d" % _wave)
 		_spawn_wave()
+	if StageManager.is_multiplayer and multiplayer.is_server():
+		_rpc_wave_start.rpc(_wave)
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
 		if _mission_runtime.mission != null:
 			if _mission_runtime.mission.objective_type == _MissionData.ObjectiveType.KILL_BOSS and _wave == 4:
@@ -1571,6 +1632,8 @@ func _on_wave_complete() -> void:
 	_hud.update_biomasa(_biomasa)
 	_spawn_scrap_text(BASE_POS + Vector2(0, -80), reward)
 	_hud.announce_wave(_wave, "OLEADA COMPLETADA  +%d CHATARRA" % reward)
+	if StageManager.is_multiplayer and multiplayer.is_server():
+		_rpc_wave_complete.rpc(reward)
 	if _mission_runtime != null and is_instance_valid(_mission_runtime):
 		_mission_runtime.notify_wave_completed()
 	await get_tree().create_timer(2.0).timeout
@@ -1860,6 +1923,29 @@ func _apply_meta_upgrades() -> void:
 	if rocket_lv > 0 and _player.has_method("add_rockets"):
 		const ROCKET_BONUS := [0, 1, 2, 4]
 		_player.add_rockets(ROCKET_BONUS[clamp(rocket_lv, 0, 3)])
+
+
+func _apply_meta_upgrades_for(p: Node2D) -> void:
+	if not is_instance_valid(p):
+		return
+	var speed_lv:  int = StageManager.get_meta_level("speed")
+	var fire_lv:   int = StageManager.get_meta_level("fire")
+	var armor_lv:  int = StageManager.get_meta_level("armor")
+	var ammo_lv:   int = StageManager.get_meta_level("ammo")
+	var damage_lv: int = StageManager.get_meta_level("damage")
+	var rocket_lv: int = StageManager.get_meta_level("rockets")
+	if speed_lv  > 0 and p.has_method("apply_meta_speed"):  p.apply_meta_speed(speed_lv)
+	if fire_lv   > 0 and p.has_method("apply_meta_fire"):   p.apply_meta_fire(fire_lv)
+	if ammo_lv   > 0 and p.has_method("apply_meta_ammo"):   p.apply_meta_ammo(ammo_lv)
+	if damage_lv > 0 and p.has_method("apply_meta_damage"): p.apply_meta_damage(damage_lv)
+	if armor_lv  > 0 and p.has_method("apply_meta_armor"):
+		const ARMOR_BONUS := [0, 25, 50, 80]
+		p.apply_meta_armor(ARMOR_BONUS[clamp(armor_lv, 0, 3)])
+		_hud.update_max_hp(p.max_hp)
+		_hud.update_hp(p.hp)
+	if rocket_lv > 0 and p.has_method("add_rockets"):
+		const ROCKET_BONUS := [0, 1, 2, 4]
+		p.add_rockets(ROCKET_BONUS[clamp(rocket_lv, 0, 3)])
 
 
 # ── Rocket handling ───────────────────────────────────────────────────────────

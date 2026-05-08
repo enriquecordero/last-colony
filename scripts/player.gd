@@ -201,7 +201,7 @@ func _physics_process(delta: float) -> void:
 				_start_reload()
 
 	if StageManager.is_multiplayer:
-		_net_sync.rpc(global_position, rotation)
+		_net_sync.rpc(global_position, rotation, hp)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -622,6 +622,9 @@ func apply_meta_damage(level: int) -> void:
 
 
 @rpc("any_peer", "unreliable_ordered")
-func _net_sync(pos: Vector2, rot: float) -> void:
+func _net_sync(pos: Vector2, rot: float, hp_val: int) -> void:
 	global_position = pos
-	rotation = rot
+	rotation        = rot
+	if hp_val != hp:
+		hp = hp_val
+		health_changed.emit(hp)
