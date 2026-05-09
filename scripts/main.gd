@@ -68,9 +68,9 @@ const SPAWN_POINTS := {
 }
 
 
-const AMMO_DROP_CHANCE  := 0.07
-const AMMO_DROP_RIFLE   := 8
-const AMMO_DROP_SHOTGUN := 2
+const AMMO_DROP_CHANCE  := 0.18
+const AMMO_DROP_RIFLE   := 22
+const AMMO_DROP_SHOTGUN := 4
 
 enum BuildType { WALL, TURRET, WALL_PLUS, MINE, BARRICADA }
 

@@ -33,6 +33,7 @@ var _stuck_offset:  Vector2 = Vector2.ZERO
 func _ready() -> void:
 	if hp < 0:
 		hp = max_hp
+	add_to_group("enemies")
 	collision_layer = 2
 	collision_mask  = 9
 	if not _sprite_tex.is_empty():

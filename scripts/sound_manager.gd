@@ -14,6 +14,7 @@ func _ready() -> void:
 	_add("flame",       180.0,  60.0, 0.06,  0.35)
 	_add("rocket",      320.0,  55.0, 0.18,  0.65)
 	_add("boss_death",   55.0,   8.0, 1.80,  1.00)
+	_add("melee",       280.0,  60.0, 0.09,  0.90)
 
 func play(key: String) -> void:
 	if _players.has(key):

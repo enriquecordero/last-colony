@@ -72,6 +72,13 @@ var _elevation_level: int     = 0
 var _stair_cooldown:  float   = 0.0
 var _current_stair:   Variant = null
 
+# Melee fallback (when totally out of ammo)
+const MELEE_RANGE    := 72.0
+const MELEE_DAMAGE   := 45
+const MELEE_COOLDOWN := 0.7
+
+var _melee_cd: float = 0.0
+
 # Dash
 const DASH_SPEED    := 620.0
 const DASH_DURATION := 0.13
@@ -157,7 +164,8 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_clamp_to_elevation_platform()
 
-	_fire_cd -= delta
+	_fire_cd  -= delta
+	_melee_cd -= delta
 	_stair_cooldown = maxf(_stair_cooldown - delta, 0.0)
 
 	# Detección de escalera
@@ -196,9 +204,12 @@ func _physics_process(delta: float) -> void:
 		if _has_mag_ammo():
 			_shoot()
 			_fire_cd = rate
-		else:
-			if _can_reload():
-				_start_reload()
+		elif _can_reload():
+			_start_reload()
+		elif _melee_cd <= 0.0:
+			_melee_shove()
+			_fire_cd  = MELEE_COOLDOWN
+			_melee_cd = MELEE_COOLDOWN
 
 	if StageManager.is_multiplayer:
 		_net_sync.rpc(global_position, rotation, hp)
@@ -436,6 +447,27 @@ func _shoot_lanzallamas() -> void:
 		bullet_container.add_child(b)
 	_flame_fuel -= 1
 	_emit_ammo()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Melee de emergencia
+# ─────────────────────────────────────────────────────────────────────────────
+
+func _melee_shove() -> void:
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(e):
+			continue
+		var dist: float = global_position.distance_to(e.global_position)
+		if dist < MELEE_RANGE:
+			if e.has_method("take_damage"):
+				e.take_damage(MELEE_DAMAGE)
+			if e is CharacterBody2D:
+				var push: Vector2 = (e.global_position - global_position).normalized() * 320.0
+				e.velocity += push
+	modulate = Color(1.0, 1.6, 1.0)
+	var tw := create_tween()
+	tw.tween_property(self, "modulate", Color.WHITE, 0.12)
+	SoundManager.play("melee")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
