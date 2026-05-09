@@ -74,7 +74,7 @@ const AMMO_DROP_SHOTGUN := 2
 
 enum BuildType { WALL, TURRET, WALL_PLUS, MINE, BARRICADA }
 
-const BUILD_PHASE_TIME := 11.0
+const BUILD_PHASE_TIME := 7.0
 const MAX_TURRETS      := 3
 
 var _player:          CharacterBody2D
@@ -1598,28 +1598,37 @@ func _spawn_wave() -> void:
 	var is_stage2:   bool  = StageManager.selected_mission_id.begins_with("stage2")
 	var is_stage3:   bool  = StageManager.selected_mission_id.begins_with("stage3")
 
-	var hp_mult:  float = 1.0 + (_wave - 1) * (0.55 if is_survival else 0.38)
-	var base_spd: float = (115.0 + (_wave - 1) * 25.0) if is_survival else (95.0 + (_wave - 1) * 20.0)
-	var count:    int   = (110 + _wave * 55) if is_survival else (55 + _wave * 18)
-	var interval: float = 0.045 if is_survival else 0.12
+	var hp_mult:  float = 1.0 + (_wave - 1) * (0.65 if is_survival else 0.48)
+	var base_spd: float = (140.0 + (_wave - 1) * 28.0) if is_survival else (120.0 + (_wave - 1) * 22.0)
+	var count:    int   = (150 + _wave * 70) if is_survival else (80 + _wave * 28)
+	var interval: float = 0.030 if is_survival else 0.055
 	if is_stage2:
 		hp_mult  *= 1.35
 		base_spd *= 1.20
-		count     = int(count * 1.25)
+		count     = int(count * 1.30)
 	if is_stage3:
 		hp_mult  *= 1.75
 		base_spd *= 1.45
-		count     = int(count * 1.45)
-		interval  = maxf(interval * 0.80, 0.04)
+		count     = int(count * 1.55)
+		interval  = maxf(interval * 0.75, 0.025)
 
 	_wave_total = count
 	_killed     = 0
 	_hud.update_enemy_progress(0, count)
 
+	# Cycle through all 8 spawn directions so every front is attacked at once
+	var dir_keys: Array = SPAWN_POINTS.keys()
+	dir_keys.shuffle()
+	var dir_idx: int = 0
+
 	for i in count:
 		await get_tree().create_timer(interval * i).timeout
 		if not _mission_active or not is_instance_valid(self):
 			return
+		# Re-shuffle after each full cycle so patterns don't repeat identically
+		if dir_idx > 0 and dir_idx % dir_keys.size() == 0:
+			dir_keys.shuffle()
+		dir_idx += 1
 		var e: CharacterBody2D
 		var r := randf()
 		if is_stage3:
@@ -1684,19 +1693,30 @@ func _spawn_wave() -> void:
 		if "fortress" in e:
 			e.fortress = _fortress
 		e.died.connect(_on_enemy_died)
-		e.position = _pick_interior_spawn_pos() if e.get("is_excavador") else _pick_spawn_pos()
+		if e.get("is_excavador"):
+			e.position = _pick_interior_spawn_pos()
+		else:
+			var dkey: String  = dir_keys[(dir_idx - 1) % dir_keys.size()]
+			var base_pt: Vector2 = SPAWN_POINTS[dkey]
+			var jitter: float = 80.0
+			if dkey == "N" or dkey == "S":
+				e.position = base_pt + Vector2(randf_range(-jitter, jitter), 0)
+			elif dkey == "E" or dkey == "W":
+				e.position = base_pt + Vector2(0, randf_range(-jitter, jitter))
+			else:
+				e.position = base_pt + Vector2(randf_range(-jitter*0.5, jitter*0.5), randf_range(-jitter*0.5, jitter*0.5))
 		_enemies.add_child(e)
 
 	# Destructores — spawnean separados del conteo normal
 	var destructor_count := 0
 	if is_stage3:
-		destructor_count = mini(_wave, 5)          # desde oleada 1
-	elif is_stage2 and _wave >= 2:
-		destructor_count = mini(_wave - 1, 4)
-	elif is_survival and _wave >= 3:
-		destructor_count = mini(_wave - 2, 3)
-	elif _wave >= 3:
-		destructor_count = mini(_wave - 2, 2)
+		destructor_count = mini(_wave + 1, 7)
+	elif is_stage2:
+		destructor_count = mini(_wave, 5)
+	elif is_survival:
+		destructor_count = mini(_wave, 4)
+	else:
+		destructor_count = mini(_wave, 3)          # desde oleada 1 en todas
 
 	for _di in destructor_count:
 		await get_tree().create_timer(randf_range(0.5, 2.5)).timeout
