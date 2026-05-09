@@ -54,7 +54,7 @@ const VIEW_H   := 720.0
 const MAP_W    := 2400.0
 const MAP_H    := 1600.0
 const BASE_POS := Vector2(MAP_W * 0.5, MAP_H * 0.5)
-const BASE_R   := 50.0
+const BASE_R   := 90.0
 
 const SPAWN_POINTS := {
 	"N":  Vector2(MAP_W * 0.5,   -55.0),
@@ -68,7 +68,7 @@ const SPAWN_POINTS := {
 }
 
 
-const AMMO_DROP_CHANCE  := 0.15
+const AMMO_DROP_CHANCE  := 0.07
 const AMMO_DROP_RIFLE   := 8
 const AMMO_DROP_SHOTGUN := 2
 
@@ -1140,11 +1140,11 @@ func _tick_base_damage(delta: float) -> void:
 	_base_dmg_cd -= delta
 	if _base_dmg_cd > 0.0:
 		return
-	_base_dmg_cd = 0.5
+	_base_dmg_cd = 0.35
 	var dmg := 0
 	for e in _enemies.get_children():
 		if is_instance_valid(e) and e.global_position.distance_to(BASE_POS) < BASE_R:
-			dmg += 5
+			dmg += 10
 	if dmg == 0:
 		return
 	_base_hp = max(0, _base_hp - dmg)
@@ -1600,8 +1600,8 @@ func _spawn_wave() -> void:
 
 	var hp_mult:  float = 1.0 + (_wave - 1) * (0.55 if is_survival else 0.38)
 	var base_spd: float = (115.0 + (_wave - 1) * 25.0) if is_survival else (95.0 + (_wave - 1) * 20.0)
-	var count:    int   = (90 + _wave * 45) if is_survival else (34 + _wave * 14)
-	var interval: float = 0.055 if is_survival else 0.17
+	var count:    int   = (110 + _wave * 55) if is_survival else (55 + _wave * 18)
+	var interval: float = 0.045 if is_survival else 0.12
 	if is_stage2:
 		hp_mult  *= 1.35
 		base_spd *= 1.20
@@ -1927,17 +1927,18 @@ func _on_enemy_died(e: Node) -> void:
 	# Loot de enemigos grandes
 	var hp_v: int = int(raw) if raw != null else 0
 
-	if hp_v >= 120 and randf() < 0.12 and is_instance_valid(_player) and _player.has_method("add_rockets"):
+	if hp_v >= 120 and randf() < 0.05 and is_instance_valid(_player) and _player.has_method("add_rockets"):
 		_player.add_rockets(1)
 	if hp_v >= 300:
-		_drop_crate(e.global_position, Crate.Type.MEDKIT)
-		if randf() < 0.55:
+		if randf() < 0.45:
+			_drop_crate(e.global_position, Crate.Type.MEDKIT)
+		if randf() < 0.14:
 			_drop_crate(e.global_position + Vector2(randf_range(-35,35), randf_range(-35,35)), Crate.Type.BOMB)
 	elif hp_v >= 100:
-		if randf() < 0.75:
+		if randf() < 0.22:
 			_drop_crate(e.global_position, Crate.Type.MEDKIT)
 	elif hp_v >= 50:
-		if randf() < 0.50:
+		if randf() < 0.18:
 			_drop_crate(e.global_position, Crate.Type.BIOMASA)
 
 	SoundManager.play("death")

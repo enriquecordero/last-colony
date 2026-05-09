@@ -20,7 +20,7 @@ var _aim_dir:         Vector2 = Vector2.RIGHT
 
 
 func _ready() -> void:
-	collision_layer = 8
+	collision_layer = 0
 	collision_mask  = 0
 	var shape := CollisionShape2D.new()
 	var rect  := RectangleShape2D.new()

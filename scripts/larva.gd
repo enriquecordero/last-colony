@@ -25,6 +25,11 @@ var _sprite_scale: float    = 0.60
 var _sprite:       Sprite2D = null
 var _draw_dir:     Vector2  = Vector2.RIGHT
 
+var _stuck_cd:      float   = 0.0
+var _stuck_check_t: float   = 0.0
+var _last_check_pos: Vector2 = Vector2.ZERO
+var _stuck_offset:  Vector2 = Vector2.ZERO
+
 func _ready() -> void:
 	if hp < 0:
 		hp = max_hp
@@ -101,7 +106,22 @@ func _update_target() -> void:
 
 func _physics_process(delta: float) -> void:
 	_update_target()
-	velocity = (_current_target - global_position).normalized() * speed
+	# Anti-stuck: if barely moved in 0.6s, inject a random lateral push
+	_stuck_check_t += delta
+	if _stuck_check_t >= 0.6:
+		_stuck_check_t = 0.0
+		if global_position.distance_to(_last_check_pos) < 8.0:
+			var perp := Vector2(-(_current_target - global_position).normalized().y,
+								 (_current_target - global_position).normalized().x)
+			_stuck_offset = perp * randf_range(0.4, 0.9) * speed
+			_stuck_cd     = 0.35
+		_last_check_pos = global_position
+	if _stuck_cd > 0.0:
+		_stuck_cd -= delta
+	else:
+		_stuck_offset = _stuck_offset.lerp(Vector2.ZERO, delta * 6.0)
+	var dir: Vector2 = (_current_target - global_position).normalized()
+	velocity = (dir * speed + _stuck_offset)
 	move_and_slide()
 	if velocity.length_squared() > 1.0:
 		_draw_dir = velocity.normalized()
