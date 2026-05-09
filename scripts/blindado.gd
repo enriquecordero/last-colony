@@ -12,7 +12,7 @@ var _last_pos:  Vector2 = Vector2.ZERO
 var _stuck_t:   float   = 0.0
 
 func _ready() -> void:
-	max_hp       = 400
+	max_hp       = 650
 	melee_damage = 40
 	body_color   = Color(0.3, 0.32, 0.38)
 	body_radius  = 20.0

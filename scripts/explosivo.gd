@@ -8,7 +8,7 @@ var _fuse_t: float = 0.0
 var _primed: bool  = false
 
 func _ready() -> void:
-	max_hp       = 55
+	max_hp       = 110
 	melee_damage = 0
 	body_color   = Color(0.85, 0.42, 0.05)
 	body_radius  = 13.0

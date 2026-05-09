@@ -2,7 +2,7 @@ extends "res://scripts/larva.gd"
 
 func _ready() -> void:
 	_is_aerial   = true
-	max_hp       = 30
+	max_hp       = 80
 	melee_damage = 8
 	body_color   = Color(0.60, 0.08, 0.90)
 	body_radius  = 9.0

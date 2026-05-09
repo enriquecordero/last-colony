@@ -118,7 +118,7 @@ var _base_dmg_cd: float = 0.0
 var _shake:       float = 0.0
 
 var _bomb_count:    int  = 0
-var _grenade_count: int  = 3
+var _grenade_count: int  = 5
 var _grenade_mode:  bool = false
 var _sats_activated:   int = 0
 var _caches_collected: int = 0
@@ -1245,7 +1245,7 @@ func _start_build_phase() -> void:
 	_build_phase_time   = BUILD_PHASE_TIME
 	_healed_this_phase  = false
 	var grenade_bonus := 1 if (is_instance_valid(_fortress) and _fortress.has_station(Fortress.StationType.GENERATOR)) else 0
-	_grenade_count      = mini(_grenade_count + 2 + grenade_bonus, 6)
+	_grenade_count      = mini(_grenade_count + 3 + grenade_bonus, 10)
 	_grenade_mode       = false
 	MusicPlayer.set_mode(MusicPlayer.Mode.BUILD)
 	_hud.show_build_phase(int(BUILD_PHASE_TIME))
@@ -1598,19 +1598,19 @@ func _spawn_wave() -> void:
 	var is_stage2:   bool  = StageManager.selected_mission_id.begins_with("stage2")
 	var is_stage3:   bool  = StageManager.selected_mission_id.begins_with("stage3")
 
-	var hp_mult:  float = 1.0 + (_wave - 1) * (0.65 if is_survival else 0.48)
-	var base_spd: float = (200.0 + (_wave - 1) * 40.0) if is_survival else (180.0 + (_wave - 1) * 30.0)
-	var count:    int   = (750 + _wave * 350) if is_survival else (400 + _wave * 140)
-	var interval: float = 0.006 if is_survival else 0.011
+	var hp_mult:  float = 1.0 + (_wave - 1) * (0.32 if is_survival else 0.22)
+	var base_spd: float = (100.0 + (_wave - 1) * 12.0) if is_survival else (90.0 + (_wave - 1) * 10.0)
+	var count:    int   = (2500 + _wave * 700) if is_survival else (1500 + _wave * 400)
+	var interval: float = 0.004 if is_survival else 0.006
 	if is_stage2:
-		hp_mult  *= 1.35
-		base_spd *= 1.20
-		count     = int(count * 1.30)
+		hp_mult  *= 1.20
+		base_spd *= 1.10
+		count     = int(count * 1.50)
 	if is_stage3:
-		hp_mult  *= 1.75
-		base_spd *= 1.45
-		count     = int(count * 1.55)
-		interval  = maxf(interval * 0.75, 0.004)
+		hp_mult  *= 1.45
+		base_spd *= 1.22
+		count     = int(count * 1.80)
+		interval  = maxf(interval * 0.80, 0.003)
 
 	_wave_total = count
 	_killed     = 0

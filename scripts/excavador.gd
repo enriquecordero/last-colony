@@ -3,7 +3,7 @@ extends "res://scripts/larva.gd"
 var is_excavador: bool = true  # main.gd lo usa para spawn interior
 
 func _ready() -> void:
-	max_hp       = 65
+	max_hp       = 140
 	melee_damage = 18
 	body_color   = Color(0.45, 0.18, 0.58)
 	body_radius  = 14.0

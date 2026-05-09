@@ -8,7 +8,7 @@ const SHOOT_RATE  = 2.2
 var _shoot_cd: float = 0.0
 
 func _ready() -> void:
-	max_hp       = 60
+	max_hp       = 130
 	melee_damage = 6
 	body_color   = Color(0.62, 0.12, 0.78)
 	body_radius  = 11.0
