@@ -54,7 +54,7 @@ const VIEW_H   := 720.0
 const MAP_W    := 2400.0
 const MAP_H    := 1600.0
 const BASE_POS := Vector2(MAP_W * 0.5, MAP_H * 0.5)
-const BASE_R   := 90.0
+const BASE_R   := 160.0
 
 const SPAWN_POINTS := {
 	"N":  Vector2(MAP_W * 0.5,   -55.0),
@@ -404,9 +404,13 @@ func _input(event: InputEvent) -> void:
 			elif _grenade_mode and _mission_active:
 				_throw_grenade(get_global_mouse_position())
 				get_viewport().set_input_as_handled()
-		elif event.button_index == MOUSE_BUTTON_RIGHT and _build_phase:
-			_repair_nearest()
-			get_viewport().set_input_as_handled()
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			if _build_phase:
+				_repair_nearest()
+				get_viewport().set_input_as_handled()
+			elif _mission_active and not _build_mode:
+				_throw_grenade(get_global_mouse_position())
+				get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(_title_ol):
@@ -1183,7 +1187,7 @@ func _tick_build_preview() -> void:
 	var mp := get_global_mouse_position()
 	preview.position = Vector2(
 		round(mp.x / 40.0) * 40.0,
-		round(mp.y / 20.0) * 20.0)
+		round(mp.y / 40.0) * 40.0)
 
 func shake(strength: float) -> void:
 	_shake = maxf(_shake, strength)

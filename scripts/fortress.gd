@@ -7,15 +7,15 @@ class_name Fortress
 # enemies can breach them and the engineer has something to repair.
 # ─────────────────────────────────────────────────────────────────────────────
 
-const OCT_RADIUS := 120.0   # center → octagon vertex
-const ARM_W      := 66.0    # corridor width
-const ARM_LEN    := 120.0   # arm length from octagon face to door
-const SOUTH_W    := 200.0   # solid south wall width
-const SOUTH_H    := 44.0    # solid south wall height
-const TOWER_L2_W := 110.0
-const TOWER_L2_H := 48.0
-const TOWER_L3_W := 74.0
-const TOWER_L3_H := 42.0
+const OCT_RADIUS := 210.0   # center → octagon vertex
+const ARM_W      := 96.0    # corridor width
+const ARM_LEN    := 180.0   # arm length from octagon face to door
+const SOUTH_W    := 310.0   # solid south wall width
+const SOUTH_H    := 60.0    # solid south wall height
+const TOWER_L2_W := 160.0
+const TOWER_L2_H := 68.0
+const TOWER_L3_W := 110.0
+const TOWER_L3_H := 60.0
 const STAIR_SIZE := 30.0
 const CORE_R     := 28.0
 
