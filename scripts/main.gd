@@ -1598,19 +1598,22 @@ func _spawn_wave() -> void:
 	var is_stage2:   bool  = StageManager.selected_mission_id.begins_with("stage2")
 	var is_stage3:   bool  = StageManager.selected_mission_id.begins_with("stage3")
 
-	var hp_mult:  float = 1.0 + (_wave - 1) * (0.32 if is_survival else 0.22)
-	var base_spd: float = (100.0 + (_wave - 1) * 12.0) if is_survival else (90.0 + (_wave - 1) * 10.0)
-	var count:    int   = (2500 + _wave * 700) if is_survival else (1500 + _wave * 400)
-	var interval: float = 0.004 if is_survival else 0.006
+	var hp_mult:   float = 1.0 + (_wave - 1) * (0.32 if is_survival else 0.22)
+	var base_spd:  float = (100.0 + (_wave - 1) * 12.0) if is_survival else (90.0 + (_wave - 1) * 10.0)
+	var count:     int   = (8000 + _wave * 1500) if is_survival else (5000 + _wave * 1000)
+	var interval:  float = 0.0015 if is_survival else 0.0025
+	var max_live:  int   = 1000 if is_survival else 800
 	if is_stage2:
 		hp_mult  *= 1.20
 		base_spd *= 1.10
 		count     = int(count * 1.50)
+		max_live  = int(max_live * 1.30)
 	if is_stage3:
 		hp_mult  *= 1.45
 		base_spd *= 1.22
 		count     = int(count * 1.80)
-		interval  = maxf(interval * 0.80, 0.003)
+		max_live  = int(max_live * 1.60)
+		interval  = maxf(interval * 0.70, 0.001)
 
 	_wave_total = count
 	_killed     = 0
@@ -1622,9 +1625,14 @@ func _spawn_wave() -> void:
 	var dir_idx: int = 0
 
 	for i in count:
-		await get_tree().create_timer(interval * i).timeout
+		await get_tree().create_timer(interval).timeout
 		if not _mission_active or not is_instance_valid(self):
 			return
+		# Cap: pause spawning when screen is already saturated (TAB carpet feel)
+		while _enemies.get_child_count() >= max_live:
+			await get_tree().create_timer(0.08).timeout
+			if not _mission_active or not is_instance_valid(self):
+				return
 		# Re-shuffle after each full cycle so patterns don't repeat identically
 		if dir_idx > 0 and dir_idx % dir_keys.size() == 0:
 			dir_keys.shuffle()
