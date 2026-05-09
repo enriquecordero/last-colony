@@ -431,9 +431,35 @@ func hide_upgrades() -> void:
 	_upg_panel.visible = false
 
 func update_upgrades(speed_lv: int, fire_lv: int, armor_lv: int, healed: bool, chatarra: int) -> void:
-	var levels  := [speed_lv, fire_lv, armor_lv, 0]
-	var blocked := [false, false, false, healed]
+	var levels   := [speed_lv, fire_lv, armor_lv, 0]
+	var blocked  := [false, false, false, healed]
+	# Meta keys for each upgrade slot — "" means no meta equivalent
+	var meta_keys := ["speed", "fire", "armor", ""]
+
+	# Determine which cards are visible (not maxed in the permanent meta tree)
+	var visible_indices: Array = []
 	for i in _UPG_INFO.size():
+		var mk: String = meta_keys[i]
+		var meta_maxed := mk != "" and StageManager.is_meta_maxed(mk)
+		_upg_cards[i].visible = not meta_maxed
+		if not meta_maxed:
+			visible_indices.append(i)
+
+	# Re-layout visible cards evenly
+	var upg_w := 172.0
+	var gap   := 12.0
+	var total_w: float = visible_indices.size() * upg_w + maxf(visible_indices.size() - 1, 0) * gap
+	var start_x: float = (760.0 - total_w) * 0.5
+	for slot in visible_indices.size():
+		var i: int = visible_indices[slot]
+		_upg_cards[i].position.x = start_x + slot * (upg_w + gap)
+
+	# Hide the whole upgrades section if nothing to show
+	_upg_panel.visible = visible_indices.size() > 0
+
+	for i in _UPG_INFO.size():
+		if not _upg_cards[i].visible:
+			continue
 		var info:  Dictionary = _UPG_INFO[i]
 		var lv:    int = levels[i]
 		var maxlv: int = int(info["max_lv"])
