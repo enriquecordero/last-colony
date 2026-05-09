@@ -80,6 +80,14 @@ var _meta_panel:       Panel      = null
 var _chatarra_lbl:     Label      = null
 var _meta_card_lbls:   Dictionary = {}
 var _title_lbl:        Label      = null
+var _nav_prev_btn:     Button     = null
+var _nav_next_btn:     Button     = null
+
+const _STAGE_ORDER: Array = ["stage1", "stage2", "stage3"]
+const _STAGE_UNLOCK: Dictionary = {
+	"stage2": "stage1_complete",
+	"stage3": "stage2_complete",
+}
 
 func _ready() -> void:
 	MusicPlayer.set_mode(MusicPlayer.Mode.MENU)
@@ -103,32 +111,22 @@ func _build() -> void:
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(sub)
 
-	# Stage nav
-	var s1_btn := Button.new()
-	s1_btn.text = "◄  STAGE 1"
-	s1_btn.add_theme_font_size_override("font_size", 14)
-	s1_btn.size     = Vector2(140, 30)
-	s1_btn.position = Vector2(20, 86)
-	s1_btn.pressed.connect(func() -> void: _switch_stage("stage1"))
-	add_child(s1_btn)
+	# Stage nav — prev (left) and next (right), never shows current stage
+	_nav_prev_btn = Button.new()
+	_nav_prev_btn.add_theme_font_size_override("font_size", 14)
+	_nav_prev_btn.size     = Vector2(140, 30)
+	_nav_prev_btn.position = Vector2(20, 86)
+	_nav_prev_btn.pressed.connect(_on_nav_prev)
+	add_child(_nav_prev_btn)
 
-	if StageManager.is_reward_unlocked("stage1_complete"):
-		var s2_btn := Button.new()
-		s2_btn.text = "STAGE 2  ►"
-		s2_btn.add_theme_font_size_override("font_size", 14)
-		s2_btn.size     = Vector2(140, 30)
-		s2_btn.position = Vector2(VIEW_W * 0.5 - 70, 86)
-		s2_btn.pressed.connect(func() -> void: _switch_stage("stage2"))
-		add_child(s2_btn)
+	_nav_next_btn = Button.new()
+	_nav_next_btn.add_theme_font_size_override("font_size", 14)
+	_nav_next_btn.size     = Vector2(140, 30)
+	_nav_next_btn.position = Vector2(VIEW_W - 160, 86)
+	_nav_next_btn.pressed.connect(_on_nav_next)
+	add_child(_nav_next_btn)
 
-	if StageManager.is_reward_unlocked("stage2_complete"):
-		var s3_btn := Button.new()
-		s3_btn.text = "STAGE 3  ►"
-		s3_btn.add_theme_font_size_override("font_size", 14)
-		s3_btn.size     = Vector2(140, 30)
-		s3_btn.position = Vector2(VIEW_W - 160, 86)
-		s3_btn.pressed.connect(func() -> void: _switch_stage("stage3"))
-		add_child(s3_btn)
+	_refresh_nav_buttons()
 
 	# Chatarra banked display
 	_chatarra_lbl = _lbl("CHATARRA: %d" % StageManager.chatarra_banked, 16, Color(0.3, 0.95, 0.55))
@@ -430,6 +428,36 @@ func _on_coop_pressed() -> void:
 	StageManager.selected_mission_id = _selected_id
 	get_tree().change_scene_to_file("res://scenes/lobby.tscn")
 
+func _refresh_nav_buttons() -> void:
+	var idx: int = _STAGE_ORDER.find(_current_stage_id)
+
+	var prev_id: String = _STAGE_ORDER[idx - 1] if idx > 0 else ""
+	_nav_prev_btn.visible = prev_id != ""
+	if prev_id != "":
+		var num: String = prev_id.trim_prefix("stage")
+		_nav_prev_btn.text = "◄  STAGE %s" % num
+
+	var next_id: String = _STAGE_ORDER[idx + 1] if idx < _STAGE_ORDER.size() - 1 else ""
+	var next_unlocked: bool = next_id != "" and \
+		StageManager.is_reward_unlocked(_STAGE_UNLOCK.get(next_id, ""))
+	_nav_next_btn.visible = next_unlocked
+	if next_unlocked:
+		var num: String = next_id.trim_prefix("stage")
+		_nav_next_btn.text = "STAGE %s  ►" % num
+
+
+func _on_nav_prev() -> void:
+	var idx: int = _STAGE_ORDER.find(_current_stage_id)
+	if idx > 0:
+		_switch_stage(_STAGE_ORDER[idx - 1])
+
+
+func _on_nav_next() -> void:
+	var idx: int = _STAGE_ORDER.find(_current_stage_id)
+	if idx < _STAGE_ORDER.size() - 1:
+		_switch_stage(_STAGE_ORDER[idx + 1])
+
+
 func _switch_stage(stage_id: String) -> void:
 	if _current_stage_id == stage_id:
 		return
@@ -445,6 +473,7 @@ func _switch_stage(stage_id: String) -> void:
 	var missions := StageRegistry.get_stage_missions(_current_stage_id)
 	for m in missions:
 		_build_card(m)
+	_refresh_nav_buttons()
 	queue_redraw()
 
 func _draw() -> void:
