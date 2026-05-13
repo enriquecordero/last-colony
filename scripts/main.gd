@@ -76,6 +76,7 @@ enum BuildType { WALL, TURRET, WALL_PLUS, MINE, BARRICADA, MORTAR }
 
 const MortarScript = preload("res://scripts/mortar.gd")
 const MortarShell  = preload("res://scripts/mortar_shell.gd")
+const OrbitalLaser = preload("res://scripts/orbital_laser.gd")
 
 const BUILD_PHASE_TIME := 14.0
 const MAX_TURRETS      := 8
@@ -132,6 +133,8 @@ var _shake:       float = 0.0
 var _bomb_count:    int  = 0
 var _grenade_count: int  = 5
 var _grenade_mode:  bool = false
+var _laser_charges: int  = 2
+var _laser_mode:    bool = false
 var _sats_activated:   int = 0
 var _caches_collected: int = 0
 var _burrows_closed:   int = 0
@@ -413,6 +416,9 @@ func _input(event: InputEvent) -> void:
 			if _build_mode:
 				_place_structure()
 				get_viewport().set_input_as_handled()
+			elif _laser_mode and _mission_active:
+				_fire_orbital_laser(get_global_mouse_position())
+				get_viewport().set_input_as_handled()
 			elif _grenade_mode and _mission_active:
 				_throw_grenade(get_global_mouse_position())
 				get_viewport().set_input_as_handled()
@@ -462,6 +468,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_use_bomb()
 			KEY_G:
 				_toggle_grenade_mode()
+			KEY_L:
+				_toggle_laser_mode()
 			KEY_ENTER, KEY_KP_ENTER:
 				if _build_phase: _end_build_phase()
 			KEY_4:
@@ -1312,6 +1320,8 @@ func _start_build_phase() -> void:
 	var grenade_bonus := 1 if (is_instance_valid(_fortress) and _fortress.has_station(Fortress.StationType.GENERATOR)) else 0
 	_grenade_count      = mini(_grenade_count + 3 + grenade_bonus, 10)
 	_grenade_mode       = false
+	_laser_charges      = mini(_laser_charges + 1, 4)
+	_laser_mode         = false
 	MusicPlayer.set_mode(MusicPlayer.Mode.BUILD)
 	_hud.show_build_phase(int(BUILD_PHASE_TIME))
 	_hud.show_upgrades(_upg_speed, _upg_fire, _upg_armor, _healed_this_phase, _biomasa)
@@ -1678,6 +1688,43 @@ func spawn_mortar_shell(from_pos: Vector2, target_pos: Vector2, dmg: int, radius
 	shell.radius          = radius
 	shell.exploded.connect(_on_mortar_shell_exploded)
 	add_child(shell)
+
+
+func _toggle_laser_mode() -> void:
+	if _laser_charges <= 0:
+		_hud.show_npc_announcement("LÁSER ORBITAL SIN CARGAS", Color(1.0, 0.4, 0.2))
+		return
+	_laser_mode = not _laser_mode
+	if _laser_mode:
+		_grenade_mode = false
+		_hud.show_npc_announcement("LÁSER ORBITAL: CLICK PARA MARCAR", Color(0.55, 0.85, 1.0))
+
+
+func _fire_orbital_laser(target_pos: Vector2) -> void:
+	if _laser_charges <= 0:
+		return
+	_laser_charges -= 1
+	_laser_mode     = false
+	var beam := OrbitalLaser.new()
+	beam.target = target_pos
+	beam.struck.connect(_on_laser_strike)
+	add_child(beam)
+	_hud.show_npc_announcement("¡LÁSER ENTRANTE! (cargas: %d)" % _laser_charges,
+		Color(0.55, 0.85, 1.0))
+
+
+func _on_laser_strike(pos: Vector2, dmg: int, radius: float) -> void:
+	for e in _enemies.get_children():
+		if is_instance_valid(e) and e.has_method("take_damage"):
+			if e.global_position.distance_to(pos) <= radius:
+				e.take_damage(dmg)
+	var ef     := BombEffect.new()
+	ef.position = pos
+	ef.max_r    = radius + 50.0
+	ef.tint     = Color(0.85, 0.95, 1.0)
+	add_child(ef)
+	shake(14.0)
+	SoundManager.play("explode")
 
 
 func _on_mortar_shell_exploded(pos: Vector2, dmg: int, radius: float) -> void:
