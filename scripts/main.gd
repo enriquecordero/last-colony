@@ -1938,9 +1938,7 @@ func _check_npc_spawn() -> void:
 		if not is_instance_valid(_assault_npc):  _spawn_assault_npc()
 		if not is_instance_valid(_medic_npc):    _spawn_medic_npc()
 		if not is_instance_valid(_engineer_npc): _spawn_engineer_npc()
-	if _wave == 3:
 		if not is_instance_valid(_sniper_npc):   _spawn_sniper_npc()
-	if _wave == 5:
 		if not is_instance_valid(_demo_npc):     _spawn_demo_npc()
 	# Extra grunts scale with wave: 3 at w1, +1 per wave up to cap
 	_extra_grunts = _extra_grunts.filter(func(n): return is_instance_valid(n))
