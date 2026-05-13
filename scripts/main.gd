@@ -1686,11 +1686,12 @@ const _DIR_NAMES: Dictionary = {
 	"S":  "SUR",     "SW": "SUROESTE",  "W":  "OESTE",  "NW": "NOROESTE",
 }
 const _DIR_ORDER: Array = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+const _DIAG := 0.70710678   # cos(45°) = sin(45°) = √2/2
 const _DIR_VECTORS: Dictionary = {
-	"N":  Vector2( 0, -1),  "NE": Vector2( 1, -1).normalized(),
-	"E":  Vector2( 1,  0),  "SE": Vector2( 1,  1).normalized(),
-	"S":  Vector2( 0,  1),  "SW": Vector2(-1,  1).normalized(),
-	"W":  Vector2(-1,  0),  "NW": Vector2(-1, -1).normalized(),
+	"N":  Vector2( 0,     -1),     "NE": Vector2( _DIAG, -_DIAG),
+	"E":  Vector2( 1,      0),     "SE": Vector2( _DIAG,  _DIAG),
+	"S":  Vector2( 0,      1),     "SW": Vector2(-_DIAG,  _DIAG),
+	"W":  Vector2(-1,      0),     "NW": Vector2(-_DIAG, -_DIAG),
 }
 var _last_wave_dir: String = ""
 
