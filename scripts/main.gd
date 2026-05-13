@@ -591,9 +591,6 @@ func _setup_mission_runtime() -> void:
 	if mission == null:
 		return
 
-	if mission.type == _MissionData.MissionType.INCURSION:
-		_fortress.position = Vector2(-9999.0, -9999.0)
-
 	if StageManager.is_reward_unlocked("antiserum") and is_instance_valid(_player):
 		_player.serum = true
 
