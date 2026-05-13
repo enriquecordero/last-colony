@@ -74,7 +74,7 @@ const AMMO_DROP_SHOTGUN := 4
 
 enum BuildType { WALL, TURRET, WALL_PLUS, MINE, BARRICADA }
 
-const BUILD_PHASE_TIME := 7.0
+const BUILD_PHASE_TIME := 14.0
 const MAX_TURRETS      := 3
 
 var _player:          CharacterBody2D
@@ -1603,7 +1603,7 @@ func _spawn_wave() -> void:
 	var is_stage3:   bool  = StageManager.selected_mission_id.begins_with("stage3")
 
 	var hp_mult:   float = 1.0 + (_wave - 1) * (0.32 if is_survival else 0.22)
-	var base_spd:  float = (100.0 + (_wave - 1) * 12.0) if is_survival else (90.0 + (_wave - 1) * 10.0)
+	var base_spd:  float = (65.0 + (_wave - 1) * 8.0) if is_survival else (55.0 + (_wave - 1) * 6.0)
 	var count:     int   = (8000 + _wave * 1500) if is_survival else (5000 + _wave * 1000)
 	var interval:  float = 0.0015 if is_survival else 0.0025
 	var max_live:  int   = 1000 if is_survival else 800

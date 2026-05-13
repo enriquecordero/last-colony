@@ -9,7 +9,7 @@ var melee_damage: int   = 5
 var body_color:   Color = Color(0.85, 0.1, 0.1)
 var body_radius:  float = 12.0
 
-var speed:            float   = 52.0
+var speed:            float   = 35.0
 var hp:               int     = -1
 var player:           Node2D
 var base_pos:         Vector2 = Vector2.ZERO

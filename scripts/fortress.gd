@@ -52,20 +52,65 @@ class Slot:
 
 # ── Damageable wall segment ──
 class FortWall extends StaticBody2D:
-	var hp:     int = 300
-	var max_hp: int = 300
+	const WARN_THRESHOLD := 0.30
 
-	func init_wall(wall_size: Vector2) -> void:
+	var hp:        int = 300
+	var max_hp:    int = 300
+	var wall_size: Vector2 = Vector2.ZERO
+	var _hit_t:    float = 0.0
+	var _warn_t:   float = 0.0
+
+	func init_wall(ws: Vector2) -> void:
 		collision_layer = 8
 		collision_mask  = 0
+		wall_size = ws
 		var cs := CollisionShape2D.new()
 		var rs := RectangleShape2D.new()
-		rs.size  = wall_size
+		rs.size  = ws
 		cs.shape = rs
 		add_child(cs)
+		set_process(true)
+		z_index = 1
+
+	func _process(delta: float) -> void:
+		var redraw: bool = false
+		if _hit_t > 0.0:
+			_hit_t = maxf(0.0, _hit_t - delta * 4.0)
+			redraw = true
+		var pct: float = float(hp) / float(maxi(max_hp, 1))
+		if pct < WARN_THRESHOLD and hp > 0:
+			_warn_t += delta * 6.5
+			redraw = true
+		if redraw:
+			queue_redraw()
+
+	func _draw() -> void:
+		if hp <= 0:
+			return
+		var pct: float = float(hp) / float(maxi(max_hp, 1))
+		var hs:  Vector2 = wall_size * 0.5
+		if _hit_t > 0.0:
+			draw_rect(Rect2(-hs, wall_size),
+				Color(1.0, 0.85, 0.55, _hit_t * 0.55))
+		if pct < WARN_THRESHOLD:
+			var pulse: float = 0.55 + 0.45 * absf(sin(_warn_t))
+			draw_rect(Rect2(-hs - Vector2(2, 2), wall_size + Vector2(4, 4)),
+				Color(1.0, 0.20, 0.10, pulse * 0.85), false, 2.5)
+		if pct < 1.0:
+			var bw: float = wall_size.x
+			var by: float = -hs.y - 6.0
+			draw_rect(Rect2(-bw * 0.5, by, bw, 3.0), Color(0.1, 0.0, 0.0, 0.85))
+			var bar_col: Color = Color(0.3, 0.85, 0.3)
+			if pct < WARN_THRESHOLD:
+				bar_col = Color(1.0, 0.25, 0.10)
+			elif pct < 0.6:
+				bar_col = Color(0.95, 0.75, 0.20)
+			draw_rect(Rect2(-bw * 0.5, by, bw * pct, 3.0), bar_col)
 
 	func take_damage(amount: int) -> void:
 		hp = maxi(0, hp - amount)
+		_hit_t = 1.0
+		queue_redraw()
 		if hp == 0:
 			for cs in get_children():
 				if cs is CollisionShape2D:
