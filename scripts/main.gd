@@ -101,6 +101,8 @@ var _medic_npc:    Node2D
 var _engineer_npc: Node2D
 var _sniper_npc:   Node2D
 var _demo_npc:     Node2D
+var _extra_grunts: Array  = []
+const EXTRA_GRUNT_CAP := 8
 
 var _wave:        int  = 0
 var _kills:       int  = 0
@@ -1188,6 +1190,15 @@ func _tick_build_preview() -> void:
 	preview.position = Vector2(
 		round(mp.x / 40.0) * 40.0,
 		round(mp.y / 40.0) * 40.0)
+	var ok: bool = _can_place_at(preview.position)
+	var tint: Color
+	if not ok:
+		tint = Color(1.4, 0.4, 0.4, 0.85)
+	elif _build_type == BuildType.WALL_PLUS:
+		tint = Color(0.6, 1.0, 0.6)
+	else:
+		tint = Color.WHITE
+	preview.modulate = tint
 
 func shake(strength: float) -> void:
 	_shake = maxf(_shake, strength)
@@ -1332,6 +1343,9 @@ func _place_structure() -> void:
 	if _biomasa < cost:
 		return
 	var pos := _active_preview().position
+	if not _can_place_at(pos):
+		_hud.show_npc_announcement("NO PUEDE CONSTRUIR AHÍ", Color(1.0, 0.4, 0.2))
+		return
 	match _build_type:
 		BuildType.WALL:
 			var w := WALL_SCENE.instantiate()
@@ -1393,6 +1407,42 @@ func _repair_nearest() -> void:
 	_biomasa -= 2
 	_hud.update_biomasa(_biomasa)
 	_hud.update_upgrades(_upg_speed, _upg_fire, _upg_armor, _healed_this_phase, _biomasa)
+
+func _can_place_at(pos: Vector2) -> bool:
+	# Out of map
+	if pos.x < 30.0 or pos.y < 30.0 or pos.x > MAP_W - 30.0 or pos.y > MAP_H - 30.0:
+		return false
+	# Don't overlap existing structures
+	for s in _walls.get_children():
+		if is_instance_valid(s) and s.global_position.distance_to(pos) < 32.0:
+			return false
+	# Respect fortress geometry — turrets allowed on platforms, walls only outside
+	if is_instance_valid(_fortress):
+		# Block: inside the octagon, arm corridors, south wall rect, towers
+		if _fortress.is_inside_hex(pos):
+			return false
+		var arms: Dictionary = _fortress.arm_polygons
+		for k in arms:
+			var poly: Array = arms[k]
+			if Geometry2D.is_point_in_polygon(pos, PackedVector2Array(poly)):
+				return false
+		var sw: Rect2 = _fortress.south_wall_rect
+		if sw.has_point(pos):
+			return false
+		var t2: Rect2 = _fortress.tower_l2_rect
+		if t2.has_point(pos) and _build_type != BuildType.TURRET:
+			return false
+		var t3: Rect2 = _fortress.tower_l3_rect
+		if t3.has_point(pos) and _build_type != BuildType.TURRET:
+			return false
+	# Don't drop on top of player or NPCs
+	if is_instance_valid(_player) and _player.global_position.distance_to(pos) < 28.0:
+		return false
+	for npc in _friendlies.get_children():
+		if is_instance_valid(npc) and npc.global_position.distance_to(pos) < 24.0:
+			return false
+	return true
+
 
 func _count_turrets() -> int:
 	var n := 0
@@ -1795,6 +1845,29 @@ func _check_npc_spawn() -> void:
 		if not is_instance_valid(_sniper_npc):   _spawn_sniper_npc()
 	if _wave == 5:
 		if not is_instance_valid(_demo_npc):     _spawn_demo_npc()
+	# Extra grunts scale with wave: 3 at w1, +1 per wave up to cap
+	_extra_grunts = _extra_grunts.filter(func(n): return is_instance_valid(n))
+	var desired: int = mini(2 + _wave, EXTRA_GRUNT_CAP)
+	while _extra_grunts.size() < desired:
+		_spawn_extra_grunt(_extra_grunts.size())
+
+
+func _spawn_extra_grunt(idx: int) -> void:
+	var g := NPCAssault.new()
+	var angle: float = TAU * float(idx) / float(EXTRA_GRUNT_CAP) + randf_range(-0.2, 0.2)
+	var dir: Vector2 = Vector2(cos(angle), sin(angle))
+	var spawn: Vector2 = _npc_spawn_pos(dir)
+	g.position         = spawn
+	g.player           = _player
+	g.base_pos         = BASE_POS
+	g.post_pos         = spawn
+	g.bullet_container = _bullets
+	g.enemies_node     = _enemies
+	g.died.connect(_on_npc_died)
+	_friendlies.add_child(g)
+	_extra_grunts.append(g)
+	if idx == 0:
+		_hud.show_npc_announcement("REFUERZOS DESPLEGADOS", Color(0.45, 0.95, 0.75))
 
 func _npc_spawn_pos(offset_normal: Vector2) -> Vector2:
 	# APO ≈ 111 + ARM_LEN/2 = 60 → midpoint of arm corridor ≈ 170
@@ -1873,6 +1946,7 @@ func _on_npc_died(npc: Node) -> void:
 	elif npc == _engineer_npc: _engineer_npc = null
 	elif npc == _sniper_npc:  _sniper_npc   = null
 	elif npc == _demo_npc:    _demo_npc     = null
+	else: _extra_grunts.erase(npc)
 
 func _on_build_card_selected(type: int) -> void:
 	if not _build_phase:
