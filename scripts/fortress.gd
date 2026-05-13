@@ -505,16 +505,18 @@ func _draw_arm_interiors() -> void:
 	var wx := -_apo - ARM_LEN * 0.5
 	draw_string(f, Vector2(wx - 20.0, 14.0), "GENERADOR",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.0, 0.83, 1.0, 0.40))
-	# Small power bolt
-	var bolt := PackedVector2Array([
-		Vector2(wx + 4.0,  -14.0),
+	# Small power bolt — two convex triangles (non-intersecting)
+	var bolt_col := Color(0.0, 0.83, 1.0, 0.45)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(wx + 4.0, -14.0),
 		Vector2(wx - 2.0,  -2.0),
 		Vector2(wx + 2.0,  -2.0),
-		Vector2(wx - 4.0,   10.0),
-		Vector2(wx + 3.0,   0.0),
-		Vector2(wx - 1.0,   0.0),
-	])
-	draw_colored_polygon(bolt, Color(0.0, 0.83, 1.0, 0.45))
+	]), bolt_col)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(wx + 3.0,  0.0),
+		Vector2(wx - 1.0,  0.0),
+		Vector2(wx - 4.0, 10.0),
+	]), bolt_col)
 
 	if gp == Vector2.ZERO: pass  # suppress unused warning
 
