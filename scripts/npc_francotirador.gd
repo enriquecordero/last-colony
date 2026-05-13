@@ -43,18 +43,32 @@ func _act(delta: float) -> void:
 	queue_redraw()
 
 func _find_threat() -> Node2D:
+	# Sniper priority: high-HP elites (tanque, blindado, corruptor, escupidor)
+	# Falls back to closest if no elites in range.
 	if not is_instance_valid(enemies_node):
 		return null
-	var best: Node2D = null
-	var best_d := RANGE * RANGE
+	var best_elite: Node2D = null
+	var best_elite_score: float = -1.0
+	var best_near: Node2D = null
+	var best_near_d: float = RANGE * RANGE
 	for e in enemies_node.get_children():
 		if not is_instance_valid(e):
 			continue
 		var d := global_position.distance_squared_to(e.global_position)
-		if d < best_d:
-			best_d = d
-			best   = e
-	return best
+		if d >= RANGE * RANGE:
+			continue
+		var emax: Variant = e.get("max_hp")
+		var ehp:  Variant = e.get("hp")
+		if emax != null and ehp != null and int(emax) >= 130:
+			# Score = remaining hp + max_hp (so tanque > blindado > corruptor)
+			var score: float = float(int(ehp)) + float(int(emax))
+			if score > best_elite_score:
+				best_elite_score = score
+				best_elite = e
+		if d < best_near_d:
+			best_near_d = d
+			best_near   = e
+	return best_elite if best_elite != null else best_near
 
 func _shoot() -> void:
 	if not is_instance_valid(bullet_container):

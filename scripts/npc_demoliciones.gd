@@ -3,18 +3,24 @@ extends "res://scripts/npc_soldier.gd"
 const BULLET_SCENE = preload("res://scenes/bullet.tscn")
 const MINE_SCENE   = preload("res://scenes/mine.tscn")
 
-const SHOOT_RANGE      := 200.0
-const SHOOT_RATE       := 0.50
-const SPEED            := 125.0
-const POST_DIST        := 55.0
-const MINE_PLACE_RATE  := 24.0
-const MAX_MINES        := 6
+const SHOOT_RANGE       := 200.0
+const SHOOT_RATE        := 0.50
+const SPEED             := 125.0
+const POST_DIST         := 55.0
+const MINE_PLACE_RATE   := 24.0
+const MAX_MINES         := 6
+const GRENADE_RATE      := 5.5
+const GRENADE_THROW_RNG := 320.0
+const CLUSTER_RADIUS    := 90.0
+const CLUSTER_MIN       := 5
 
 var bullet_container: Node2D
 var enemies_node:     Node2D
 var walls_node:       Node2D
+var main_ref:         Node = null
 var _shoot_cd:   float   = randf_range(0.0, 0.5)
 var _mine_cd:    float   = 4.0
+var _gren_cd:    float   = 2.0
 var _aim_dir:    Vector2 = Vector2.RIGHT
 var _mines_laid: int     = 0
 
@@ -27,9 +33,16 @@ func _ready() -> void:
 func _act(delta: float) -> void:
 	_shoot_cd -= delta
 	_mine_cd  -= delta
+	_gren_cd  -= delta
 
 	if _mine_cd <= 0.0 and _mines_laid < MAX_MINES:
 		_place_mine()
+
+	if _gren_cd <= 0.0:
+		var cluster_pos: Vector2 = _find_cluster()
+		if cluster_pos != Vector2.INF:
+			_throw_grenade_at(cluster_pos)
+			_gren_cd = GRENADE_RATE
 
 	var threat := _find_threat()
 	if is_instance_valid(threat):
@@ -83,6 +96,35 @@ func _shoot() -> void:
 		b.bradius         = 5.0
 		bullet_container.call_deferred("add_child", b)
 	_shoot_cd = SHOOT_RATE
+
+func _find_cluster() -> Vector2:
+	if not is_instance_valid(enemies_node):
+		return Vector2.INF
+	var best_pos: Vector2 = Vector2.INF
+	var best_count: int = CLUSTER_MIN - 1
+	var children: Array = enemies_node.get_children()
+	for anchor in children:
+		if not is_instance_valid(anchor):
+			continue
+		var ap: Vector2 = anchor.global_position
+		if global_position.distance_to(ap) > GRENADE_THROW_RNG:
+			continue
+		var count: int = 0
+		for e in children:
+			if is_instance_valid(e) and ap.distance_squared_to(e.global_position) <= CLUSTER_RADIUS * CLUSTER_RADIUS:
+				count += 1
+		if count > best_count:
+			best_count = count
+			best_pos   = ap
+	return best_pos
+
+
+func _throw_grenade_at(target_pos: Vector2) -> void:
+	if main_ref == null or not is_instance_valid(main_ref):
+		return
+	if main_ref.has_method("throw_npc_grenade"):
+		main_ref.throw_npc_grenade(global_position, target_pos)
+
 
 func _place_mine() -> void:
 	if not is_instance_valid(walls_node):

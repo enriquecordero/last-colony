@@ -104,6 +104,13 @@ var _demo_npc:     Node2D
 var _extra_grunts: Array  = []
 const EXTRA_GRUNT_CAP := 8
 
+# Player downed-revive state (active when medic is alive at moment of death)
+var _player_down_active: bool  = false
+var _player_down_t:      float = 0.0
+const PLAYER_DOWN_TIMEOUT := 10.0
+const PLAYER_REVIVE_RANGE := 60.0
+const PLAYER_REVIVE_HP    := 60
+
 var _wave:        int  = 0
 var _kills:       int  = 0
 var _killed:      int  = 0
@@ -1114,6 +1121,27 @@ func _physics_process(delta: float) -> void:
 	_tick_regen(delta)
 	_tick_events(delta)
 	_tick_fortress_hints()
+	_tick_player_down(delta)
+
+
+func _tick_player_down(delta: float) -> void:
+	if not _player_down_active:
+		return
+	_player_down_t -= delta
+	# Revive if medic alive AND in range
+	if is_instance_valid(_medic_npc) and not _medic_npc.get("down"):
+		if _medic_npc.global_position.distance_to(_player.global_position) <= PLAYER_REVIVE_RANGE:
+			_player_down_active = false
+			_player.hp = PLAYER_REVIVE_HP
+			_player.modulate = Color.WHITE
+			_player.set_physics_process(true)
+			if _player.has_signal("health_changed"):
+				_player.health_changed.emit(PLAYER_REVIVE_HP)
+			_hud.show_npc_announcement("REANIMADO", Color(0.3, 1.0, 0.55))
+			return
+	# Medic died or timer ran out → real game over
+	if not is_instance_valid(_medic_npc) or _medic_npc.get("down") or _player_down_t <= 0.0:
+		_finalize_player_death()
 
 func _tick_fortress_hints() -> void:
 	if not is_instance_valid(_fortress) or not is_instance_valid(_player):
@@ -1592,6 +1620,15 @@ func _throw_grenade(target_pos: Vector2) -> void:
 	g.exploded.connect(_on_grenade_exploded)
 	add_child(g)
 
+
+# Public: NPCs (demolitions) can throw free grenades — no count cost.
+func throw_npc_grenade(from_pos: Vector2, target_pos: Vector2) -> void:
+	var g          := Grenade.new()
+	g.target        = target_pos
+	g.global_position = from_pos
+	g.exploded.connect(_on_grenade_exploded)
+	add_child(g)
+
 func _on_grenade_exploded(pos: Vector2) -> void:
 	const GRENADE_RADIUS := 140.0
 	for e in _enemies.get_children():
@@ -1931,6 +1968,7 @@ func _spawn_demo_npc() -> void:
 	_demo_npc.bullet_container = _bullets
 	_demo_npc.enemies_node     = _enemies
 	_demo_npc.walls_node       = _walls
+	_demo_npc.main_ref         = self
 	_demo_npc.died.connect(_on_npc_died)
 	_friendlies.add_child(_demo_npc)
 	_hud.show_npc_announcement("DEMOLICIONES", Color(1.0, 0.55, 0.15))
@@ -1941,12 +1979,23 @@ func _is_survival() -> bool:
 		and _mission_runtime.mission.type == _MissionData.MissionType.SURVIVAL
 
 func _on_npc_died(npc: Node) -> void:
-	if npc == _assault_npc:   _assault_npc  = null
-	elif npc == _medic_npc:   _medic_npc    = null
-	elif npc == _engineer_npc: _engineer_npc = null
-	elif npc == _sniper_npc:  _sniper_npc   = null
-	elif npc == _demo_npc:    _demo_npc     = null
-	else: _extra_grunts.erase(npc)
+	if npc == _assault_npc:
+		_assault_npc = null
+		_hud.show_npc_announcement("¡ASALTO CAÍDO!", Color(1.0, 0.45, 0.25))
+	elif npc == _medic_npc:
+		_medic_npc = null
+		_hud.show_npc_announcement("¡MÉDICO CAÍDO! sin reanimación", Color(1.0, 0.30, 0.20))
+	elif npc == _engineer_npc:
+		_engineer_npc = null
+		_hud.show_npc_announcement("¡INGENIERO CAÍDO! muros sin reparar", Color(1.0, 0.50, 0.10))
+	elif npc == _sniper_npc:
+		_sniper_npc = null
+		_hud.show_npc_announcement("¡FRANCOTIRADOR CAÍDO! elites libres", Color(0.95, 0.55, 0.35))
+	elif npc == _demo_npc:
+		_demo_npc = null
+		_hud.show_npc_announcement("¡DEMOLICIONES CAÍDO! sin explosivos", Color(1.0, 0.40, 0.15))
+	else:
+		_extra_grunts.erase(npc)
 
 func _on_build_card_selected(type: int) -> void:
 	if not _build_phase:
@@ -2077,9 +2126,29 @@ func _spawn_ammo_text(pos: Vector2) -> void:
 	tw.tween_callback(lbl.queue_free)
 
 func _on_player_died() -> void:
+	# If the medic is alive, the player goes "down" with a revive timer
+	# instead of game-over. Medic auto-targets downed player.
+	if is_instance_valid(_medic_npc) and not _medic_npc.get("down"):
+		_start_player_downed()
+		return
+	_finalize_player_death()
+
+
+func _start_player_downed() -> void:
+	if _player_down_active:
+		return
+	_player_down_active = true
+	_player_down_t      = PLAYER_DOWN_TIMEOUT
+	_player.set_physics_process(false)
+	_player.modulate = Color(0.4, 0.4, 0.4)
+	_hud.show_npc_announcement("¡CAÍSTE! MÉDICO EN CAMINO", Color(1.0, 0.55, 0.10))
+
+
+func _finalize_player_death() -> void:
 	_game_over      = true
 	_mission_active = false
 	_bomb_count     = 0
+	_player_down_active = false
 	MusicPlayer.set_mode(MusicPlayer.Mode.SILENT)
 	_set_build_mode(false)
 	_hud.hide_upgrades()
