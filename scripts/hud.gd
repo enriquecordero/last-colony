@@ -18,10 +18,11 @@ const _UPG_INFO := [
 
 const _BUILD_INFO := [
 	{"name": "MURO",      "cost": 3,  "key": "B", "color": Color(0.70, 0.90, 0.70)},
-	{"name": "TORRETA",   "cost": 8,  "key": "T", "color": Color(1.00, 0.75, 0.20)},
+	{"name": "TORRETA",   "cost": 18, "key": "T", "color": Color(1.00, 0.75, 0.20)},
 	{"name": "MURO +",    "cost": 5,  "key": "N", "color": Color(0.50, 1.00, 0.55)},
 	{"name": "MINA",      "cost": 3,  "key": "M", "color": Color(0.90, 0.50, 0.90)},
 	{"name": "BARRICADA", "cost": 4,  "key": "C", "color": Color(0.85, 0.75, 0.45)},
+	{"name": "MORTERO",   "cost": 30, "key": "X", "color": Color(1.00, 0.55, 0.20)},
 ]
 
 var _hp_lbl:          Label

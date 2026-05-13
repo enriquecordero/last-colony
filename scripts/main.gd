@@ -72,7 +72,10 @@ const AMMO_DROP_CHANCE  := 0.18
 const AMMO_DROP_RIFLE   := 22
 const AMMO_DROP_SHOTGUN := 4
 
-enum BuildType { WALL, TURRET, WALL_PLUS, MINE, BARRICADA }
+enum BuildType { WALL, TURRET, WALL_PLUS, MINE, BARRICADA, MORTAR }
+
+const MortarScript = preload("res://scripts/mortar.gd")
+const MortarShell  = preload("res://scripts/mortar_shell.gd")
 
 const BUILD_PHASE_TIME := 14.0
 const MAX_TURRETS      := 8
@@ -444,6 +447,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				if _build_phase: _set_build_type(BuildType.MINE)
 			KEY_C:
 				if _build_phase: _set_build_type(BuildType.BARRICADA)
+			KEY_X:
+				if _build_phase: _set_build_type(BuildType.MORTAR)
 			KEY_ESCAPE:
 				if _build_mode:
 					_set_build_mode(false)
@@ -1213,7 +1218,7 @@ func _tick_build_preview() -> void:
 		return
 	var mp := get_global_mouse_position()
 	# Turrets snap to fortress slots when cursor is near one
-	if _build_type == BuildType.TURRET and is_instance_valid(_fortress):
+	if (_build_type == BuildType.TURRET or _build_type == BuildType.MORTAR) and is_instance_valid(_fortress):
 		var slots: Array = _fortress.get_turret_slots()
 		var best: Vector2 = Vector2.INF
 		var best_d: float = 90.0   # snap radius
@@ -1348,7 +1353,7 @@ func _set_build_mode(on: bool) -> void:
 	_build_mode                = on
 	_player.building           = on
 	_wall_preview.visible      = on and (_build_type == BuildType.WALL or _build_type == BuildType.WALL_PLUS)
-	_turret_preview.visible    = on and _build_type == BuildType.TURRET
+	_turret_preview.visible    = on and (_build_type == BuildType.TURRET or _build_type == BuildType.MORTAR)
 	_mine_preview.visible      = on and _build_type == BuildType.MINE
 	_barricada_preview.visible = on and _build_type == BuildType.BARRICADA
 	if on:
@@ -1362,6 +1367,7 @@ func _set_build_mode(on: bool) -> void:
 func _active_preview() -> Node2D:
 	match _build_type:
 		BuildType.TURRET:    return _turret_preview
+		BuildType.MORTAR:    return _turret_preview
 		BuildType.WALL_PLUS: return _wall_preview
 		BuildType.MINE:      return _mine_preview
 		BuildType.BARRICADA: return _barricada_preview
@@ -1373,6 +1379,7 @@ func _build_cost() -> int:
 		BuildType.WALL_PLUS: return 5
 		BuildType.MINE:      return 3
 		BuildType.BARRICADA: return 4
+		BuildType.MORTAR:    return 30
 		_:                   return 3
 
 func _build_type_name() -> String:
@@ -1381,6 +1388,7 @@ func _build_type_name() -> String:
 		BuildType.WALL_PLUS: return "MURO +"
 		BuildType.MINE:      return "MINA"
 		BuildType.BARRICADA: return "BARRICADA"
+		BuildType.MORTAR:    return "MORTERO"
 		_:                   return "MURO"
 
 func _place_structure() -> void:
@@ -1423,6 +1431,13 @@ func _place_structure() -> void:
 			b.position = pos
 			b.destroyed.connect(func(): pass)
 			_walls.add_child(b)
+		BuildType.MORTAR:
+			var m := MortarScript.new()
+			m.position         = pos
+			m.bullet_container = _bullets
+			m.enemies_node     = _enemies
+			m.main_ref         = self
+			_walls.add_child(m)
 	_biomasa -= cost
 	_hud.update_biomasa(_biomasa)
 	_hud.update_upgrades(_upg_speed, _upg_fire, _upg_armor, _healed_this_phase, _biomasa)
@@ -1652,6 +1667,31 @@ func throw_npc_grenade(from_pos: Vector2, target_pos: Vector2) -> void:
 	g.global_position = from_pos
 	g.exploded.connect(_on_grenade_exploded)
 	add_child(g)
+
+
+# Public: mortar structures fire shells through here
+func spawn_mortar_shell(from_pos: Vector2, target_pos: Vector2, dmg: int, radius: float) -> void:
+	var shell := MortarShell.new()
+	shell.global_position = from_pos
+	shell.target_pos      = target_pos
+	shell.damage          = dmg
+	shell.radius          = radius
+	shell.exploded.connect(_on_mortar_shell_exploded)
+	add_child(shell)
+
+
+func _on_mortar_shell_exploded(pos: Vector2, dmg: int, radius: float) -> void:
+	for e in _enemies.get_children():
+		if is_instance_valid(e) and e.has_method("take_damage"):
+			if e.global_position.distance_to(pos) <= radius:
+				e.take_damage(dmg)
+	var ef     := BombEffect.new()
+	ef.position = pos
+	ef.max_r    = radius + 30.0
+	ef.tint     = Color(1.0, 0.65, 0.20)
+	add_child(ef)
+	shake(6.0)
+	SoundManager.play("explode")
 
 func _on_grenade_exploded(pos: Vector2) -> void:
 	const GRENADE_RADIUS := 140.0
