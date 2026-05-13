@@ -1867,20 +1867,21 @@ func _spawn_wave() -> void:
 
 	var hp_mult:   float = 1.0 + (_wave - 1) * (0.32 if is_survival else 0.22)
 	var base_spd:  float = (65.0 + (_wave - 1) * 8.0) if is_survival else (55.0 + (_wave - 1) * 6.0)
-	var count:     int   = (8000 + _wave * 1500) if is_survival else (5000 + _wave * 1000)
-	var interval:  float = 0.0015 if is_survival else 0.0025
-	var max_live:  int   = 1000 if is_survival else 800
+	# Wave totals trimmed so each wave is a discrete event with a clear end
+	var count:     int   = (550 + _wave * 220) if is_survival else (380 + _wave * 150)
+	var interval:  float = 0.0025 if is_survival else 0.0035
+	var max_live:  int   = 700 if is_survival else 550
 	if is_stage2:
 		hp_mult  *= 1.20
 		base_spd *= 1.10
-		count     = int(count * 1.50)
-		max_live  = int(max_live * 1.30)
+		count     = int(count * 1.40)
+		max_live  = int(max_live * 1.20)
 	if is_stage3:
 		hp_mult  *= 1.45
 		base_spd *= 1.22
-		count     = int(count * 1.80)
-		max_live  = int(max_live * 1.60)
-		interval  = maxf(interval * 0.70, 0.001)
+		count     = int(count * 1.70)
+		max_live  = int(max_live * 1.40)
+		interval  = maxf(interval * 0.75, 0.002)
 
 	_wave_total = count
 	_killed     = 0
