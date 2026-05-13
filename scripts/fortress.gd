@@ -54,8 +54,8 @@ class Slot:
 class FortWall extends StaticBody2D:
 	const WARN_THRESHOLD := 0.30
 
-	var hp:        int = 300
-	var max_hp:    int = 300
+	var hp:        int = 600
+	var max_hp:    int = 600
 	var wall_size: Vector2 = Vector2.ZERO
 	var _hit_t:    float = 0.0
 	var _warn_t:   float = 0.0
@@ -389,6 +389,9 @@ func _draw() -> void:
 	# 8) Station slots
 	for slot in slots:
 		_draw_slot(slot)
+
+	# 8b) Turret deployment pads (perimeter)
+	_draw_turret_pads()
 
 	# 9) Core
 	_draw_core(c)
@@ -907,3 +910,35 @@ func get_level_bounds(level: int, _pos: Vector2) -> Rect2:
 
 func get_damageable_walls() -> Array:
 	return _fort_walls
+
+
+# Eight perimeter slots around the fortress where turrets snap into place.
+# Positions are outside the octagon and corridor walls, evenly spaced.
+func get_turret_slots() -> Array:
+	var c: Vector2 = hex_center
+	var r: float   = _apo + ARM_LEN + 50.0   # just past the corridor doors
+	var slots_arr: Array = []
+	for i in 8:
+		var a: float = TAU * float(i) / 8.0 - PI * 0.5   # start at N
+		slots_arr.append(c + Vector2(cos(a), sin(a)) * r)
+	return slots_arr
+
+
+func _draw_turret_pads() -> void:
+	var gp := global_position
+	for s in get_turret_slots():
+		var p: Vector2 = s - gp
+		# Octagonal pad outline
+		var pts := PackedVector2Array()
+		for i in 8:
+			var a: float = TAU * float(i) / 8.0 + PI / 8.0
+			pts.append(p + Vector2(cos(a), sin(a)) * 18.0)
+		draw_colored_polygon(pts, Color(0.20, 0.28, 0.36, 0.45))
+		# Edge highlight
+		for i in 8:
+			var a: int = i
+			var b: int = (i + 1) % 8
+			draw_line(pts[a], pts[b], Color(0.55, 0.78, 0.95, 0.65), 1.2)
+		# Center cross
+		draw_line(p + Vector2(-6, 0), p + Vector2(6, 0), Color(0.65, 0.85, 1.0, 0.55), 1.5)
+		draw_line(p + Vector2(0, -6), p + Vector2(0, 6), Color(0.65, 0.85, 1.0, 0.55), 1.5)

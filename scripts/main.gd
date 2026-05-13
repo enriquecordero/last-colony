@@ -75,7 +75,7 @@ const AMMO_DROP_SHOTGUN := 4
 enum BuildType { WALL, TURRET, WALL_PLUS, MINE, BARRICADA }
 
 const BUILD_PHASE_TIME := 14.0
-const MAX_TURRETS      := 3
+const MAX_TURRETS      := 8
 
 var _player:          CharacterBody2D
 var _player2:         CharacterBody2D = null
@@ -622,8 +622,8 @@ func _spawn_fortress_turrets() -> void:
 func _place_fort_turret(pos: Vector2) -> void:
 	var t := TURRET_SCENE.instantiate()
 	t.position         = pos
-	t.hp               = 250
-	t.max_hp           = 250
+	t.hp               = 400
+	t.max_hp           = 400
 	t.bullet_container = _bullets
 	t.enemies_node     = _enemies
 	_walls.add_child(t)
@@ -1212,9 +1212,29 @@ func _tick_build_preview() -> void:
 	if not preview.visible:
 		return
 	var mp := get_global_mouse_position()
-	preview.position = Vector2(
-		round(mp.x / 40.0) * 40.0,
-		round(mp.y / 40.0) * 40.0)
+	# Turrets snap to fortress slots when cursor is near one
+	if _build_type == BuildType.TURRET and is_instance_valid(_fortress):
+		var slots: Array = _fortress.get_turret_slots()
+		var best: Vector2 = Vector2.INF
+		var best_d: float = 90.0   # snap radius
+		for s in slots:
+			var sv: Vector2 = s
+			if not _slot_is_free(sv):
+				continue
+			var d: float = mp.distance_to(sv)
+			if d < best_d:
+				best_d = d
+				best   = sv
+		if best != Vector2.INF:
+			preview.position = best
+		else:
+			preview.position = Vector2(
+				round(mp.x / 40.0) * 40.0,
+				round(mp.y / 40.0) * 40.0)
+	else:
+		preview.position = Vector2(
+			round(mp.x / 40.0) * 40.0,
+			round(mp.y / 40.0) * 40.0)
 	var ok: bool = _can_place_at(preview.position)
 	var tint: Color
 	if not ok:
@@ -1432,6 +1452,13 @@ func _repair_nearest() -> void:
 	_biomasa -= 2
 	_hud.update_biomasa(_biomasa)
 	_hud.update_upgrades(_upg_speed, _upg_fire, _upg_armor, _healed_this_phase, _biomasa)
+
+func _slot_is_free(slot_pos: Vector2) -> bool:
+	for s in _walls.get_children():
+		if is_instance_valid(s) and s.global_position.distance_to(slot_pos) < 32.0:
+			return false
+	return true
+
 
 func _can_place_at(pos: Vector2) -> bool:
 	# Out of map

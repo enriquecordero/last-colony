@@ -35,7 +35,7 @@ func _ready() -> void:
 		hp = max_hp
 	add_to_group("enemies")
 	collision_layer = 2
-	collision_mask  = 9
+	collision_mask  = 41   # 1 (player) | 8 (walls) | 32 (turrets/destructible structures)
 	if not _sprite_tex.is_empty():
 		_sprite                = Sprite2D.new()
 		_sprite.texture        = load(_sprite_tex)
@@ -133,7 +133,7 @@ func _physics_process(delta: float) -> void:
 		for i in get_slide_collision_count():
 			var col  := get_slide_collision(i)
 			var body := col.get_collider()
-			if is_instance_valid(body) and (body.collision_layer & 8) and body.has_method("take_damage"):
+			if is_instance_valid(body) and (body.collision_layer & 40) and body.has_method("take_damage"):
 				body.take_damage(melee_damage)
 				_wall_dmg_cd = DAMAGE_INTERVAL
 				break

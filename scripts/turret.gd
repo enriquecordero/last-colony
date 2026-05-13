@@ -20,7 +20,8 @@ var _aim_dir:         Vector2 = Vector2.RIGHT
 
 
 func _ready() -> void:
-	collision_layer = 0
+	# Layer 32: damageable structures that enemies attack but player can walk through
+	collision_layer = 32
 	collision_mask  = 0
 	var shape := CollisionShape2D.new()
 	var rect  := RectangleShape2D.new()
