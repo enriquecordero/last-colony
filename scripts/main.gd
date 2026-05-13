@@ -54,7 +54,7 @@ const VIEW_H   := 720.0
 const MAP_W    := 2400.0
 const MAP_H    := 1600.0
 const BASE_POS := Vector2(MAP_W * 0.5, MAP_H * 0.5)
-const BASE_R   := 160.0
+const BASE_R   := 200.0
 
 const SPAWN_POINTS := {
 	"N":  Vector2(MAP_W * 0.5,   -55.0),
@@ -1681,6 +1681,70 @@ func _start_mission() -> void:
 			if _mission_runtime.mission.objective_type == _MissionData.ObjectiveType.KILL_BOSS and _wave == 4:
 				_spawn_boss()
 
+const _DIR_NAMES: Dictionary = {
+	"N":  "NORTE",   "NE": "NORESTE",   "E":  "ESTE",   "SE": "SURESTE",
+	"S":  "SUR",     "SW": "SUROESTE",  "W":  "OESTE",  "NW": "NOROESTE",
+}
+const _DIR_ORDER: Array = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+const _DIR_VECTORS: Dictionary = {
+	"N":  Vector2( 0, -1),  "NE": Vector2( 1, -1).normalized(),
+	"E":  Vector2( 1,  0),  "SE": Vector2( 1,  1).normalized(),
+	"S":  Vector2( 0,  1),  "SW": Vector2(-1,  1).normalized(),
+	"W":  Vector2(-1,  0),  "NW": Vector2(-1, -1).normalized(),
+}
+var _last_wave_dir: String = ""
+
+
+func _pick_wave_direction() -> String:
+	var candidates: Array = _DIR_ORDER.duplicate()
+	# Avoid repeating the previous wave's direction
+	if _last_wave_dir != "":
+		candidates.erase(_last_wave_dir)
+	candidates.shuffle()
+	_last_wave_dir = candidates[0]
+	return _last_wave_dir
+
+
+func _adjacent_dir(d: String) -> String:
+	var idx: int = _DIR_ORDER.find(d)
+	if idx < 0:
+		return d
+	# 50/50 pick left or right neighbor
+	var side: int = -1 if randi() % 2 == 0 else 1
+	return _DIR_ORDER[(idx + side + 8) % 8]
+
+
+func _announce_wave_direction(dir: String) -> void:
+	var label: String = _DIR_NAMES.get(dir, "?")
+	_hud.show_npc_announcement("¡AMENAZA DESDE EL %s!" % label, Color(1.0, 0.55, 0.10))
+	_hud.set_minimap_threat(_DIR_VECTORS.get(dir, Vector2.ZERO))
+
+
+func _rally_npcs_to(dir: String) -> void:
+	var v: Vector2 = _DIR_VECTORS.get(dir, Vector2.ZERO)
+	if v == Vector2.ZERO:
+		return
+	# Rally point: just outside the fortress on the threat side
+	var rally_center: Vector2 = BASE_POS + v * 230.0
+	var combat_npcs: Array = [_assault_npc, _demo_npc, _engineer_npc]
+	for n in combat_npcs:
+		if is_instance_valid(n):
+			n.post_pos = rally_center + Vector2(randf_range(-40.0, 40.0), randf_range(-40.0, 40.0))
+			if n == _engineer_npc:
+				n.current_threat_dir = v
+	# Sniper stays a bit further back (range advantage)
+	if is_instance_valid(_sniper_npc):
+		_sniper_npc.post_pos = BASE_POS + v * 180.0
+	# Extra grunts fan out around the rally point
+	for i in _extra_grunts.size():
+		var g = _extra_grunts[i]
+		if not is_instance_valid(g):
+			continue
+		var perp: Vector2 = Vector2(-v.y, v.x)
+		var offset: Vector2 = perp * (float(i) - float(_extra_grunts.size() - 1) * 0.5) * 55.0
+		g.post_pos = rally_center + offset
+
+
 func _spawn_wave() -> void:
 	var is_survival: bool  = _is_survival()
 	var is_stage2:   bool  = StageManager.selected_mission_id.begins_with("stage2")
@@ -1707,24 +1771,20 @@ func _spawn_wave() -> void:
 	_killed     = 0
 	_hud.update_enemy_progress(0, count)
 
-	# Cycle through all 8 spawn directions so every front is attacked at once
-	var dir_keys: Array = SPAWN_POINTS.keys()
-	dir_keys.shuffle()
-	var dir_idx: int = 0
+	# Pick ONE primary direction per wave (15% flanking from adjacent)
+	var primary_dir: String = _pick_wave_direction()
+	var flank_dir:   String = _adjacent_dir(primary_dir)
+	_announce_wave_direction(primary_dir)
+	_rally_npcs_to(primary_dir)
 
 	for i in count:
 		await get_tree().create_timer(interval).timeout
 		if not _mission_active or not is_instance_valid(self):
 			return
-		# Cap: pause spawning when screen is already saturated (TAB carpet feel)
 		while _enemies.get_child_count() >= max_live:
 			await get_tree().create_timer(0.08).timeout
 			if not _mission_active or not is_instance_valid(self):
 				return
-		# Re-shuffle after each full cycle so patterns don't repeat identically
-		if dir_idx > 0 and dir_idx % dir_keys.size() == 0:
-			dir_keys.shuffle()
-		dir_idx += 1
 		var e: CharacterBody2D
 		var r := randf()
 		if is_stage3:
@@ -1792,9 +1852,10 @@ func _spawn_wave() -> void:
 		if e.get("is_excavador"):
 			e.position = _pick_interior_spawn_pos()
 		else:
-			var dkey: String  = dir_keys[(dir_idx - 1) % dir_keys.size()]
+			# 85% from the primary front, 15% from the flank — concentrated push
+			var dkey: String = primary_dir if randf() < 0.85 else flank_dir
 			var base_pt: Vector2 = SPAWN_POINTS[dkey]
-			var jitter: float = 80.0
+			var jitter: float = 110.0
 			if dkey == "N" or dkey == "S":
 				e.position = base_pt + Vector2(randf_range(-jitter, jitter), 0)
 			elif dkey == "E" or dkey == "W":
@@ -1852,6 +1913,7 @@ func _on_wave_complete() -> void:
 	_grenade_mode   = false
 	_hud.update_grenade(_grenade_count, false)
 	_hud.update_enemy_progress(0, 0)
+	_hud.set_minimap_threat(Vector2.ZERO)
 	shake(8.0)
 	var reward := 8 + _wave * 2
 	var gen_bonus := 15 if (is_instance_valid(_fortress) and _fortress.has_station(Fortress.StationType.GENERATOR)) else 0
