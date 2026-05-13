@@ -90,10 +90,11 @@ func _draw() -> void:
 	draw_circle(Vector2(0, 4), 20.0, Color(0.20, 0.18, 0.18))
 	draw_circle(Vector2.ZERO, 16.0, Color(0.38, 0.32, 0.28))
 	draw_arc(Vector2.ZERO, 16.0, 0, TAU, 24, Color(0.65, 0.55, 0.40), 2.0)
-	# Tube pointing at last aim
-	var perp: Vector2 = Vector2(-_aim_dir.y, _aim_dir.x) * 4.0
-	var base: Vector2 = -_aim_dir * 2.0
-	var tip:  Vector2 = _aim_dir * 18.0
+	# Tube pointing at last aim (guard against zero aim dir → degenerate polygon)
+	var dir: Vector2 = _aim_dir if _aim_dir.length_squared() > 0.01 else Vector2.UP
+	var perp: Vector2 = Vector2(-dir.y, dir.x) * 4.0
+	var base: Vector2 = -dir * 2.0
+	var tip:  Vector2 = dir * 18.0
 	draw_colored_polygon(PackedVector2Array([
 		base + perp, base - perp, tip - perp, tip + perp
 	]), Color(0.50, 0.40, 0.30))

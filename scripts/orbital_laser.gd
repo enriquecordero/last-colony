@@ -51,13 +51,13 @@ func _draw() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16,
 			Color(1.0, 0.90, 0.40, pulse))
 	elif _phase == 1:
-		# Beam from sky to target
+		# Beam from sky to target — modest length/width to play nice with batching
 		var alpha: float = 1.0 - clampf(_t / BEAM_TIME, 0.0, 1.0)
-		var top: Vector2 = p + Vector2(0, -1200.0)
-		draw_line(top, p, Color(0.55, 0.85, 1.0, alpha * 0.85), 18.0)
-		draw_line(top, p, Color(1.0, 1.0, 1.0, alpha), 8.0)
+		var top: Vector2 = p + Vector2(0, -600.0)
+		draw_line(top, p, Color(0.55, 0.85, 1.0, alpha * 0.85), 10.0)
+		draw_line(top, p, Color(1.0, 1.0, 1.0, alpha), 4.0)
 		# Ground impact ring
 		draw_circle(p, BEAM_RADIUS * (0.4 + (1.0 - alpha) * 0.6),
 			Color(1.0, 0.95, 0.55, alpha * 0.4))
-		draw_arc(p, BEAM_RADIUS, 0.0, TAU, 48,
-			Color(1.0, 0.95, 0.55, alpha), 4.0)
+		draw_arc(p, BEAM_RADIUS, 0.0, TAU, 32,
+			Color(1.0, 0.95, 0.55, alpha), 3.0)
