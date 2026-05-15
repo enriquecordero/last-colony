@@ -77,6 +77,7 @@ enum BuildType { WALL, TURRET, WALL_PLUS, MINE, BARRICADA, MORTAR }
 const MortarScript = preload("res://scripts/mortar.gd")
 const MortarShell  = preload("res://scripts/mortar_shell.gd")
 const OrbitalLaser = preload("res://scripts/orbital_laser.gd")
+const WaveEvent    = preload("res://scripts/wave_event.gd")
 
 const BUILD_PHASE_TIME := 14.0
 const MAX_TURRETS      := 8
@@ -135,6 +136,11 @@ var _grenade_count: int  = 5
 var _grenade_mode:  bool = false
 var _laser_charges: int  = 2
 var _laser_mode:    bool = false
+
+# Mid-wave events
+var _wave_events:        Array = []
+var _wave_event_next_t:  float = 0.0
+var _wave_event_dir:     Vector2 = Vector2.ZERO  # current threat direction
 var _sats_activated:   int = 0
 var _caches_collected: int = 0
 var _burrows_closed:   int = 0
@@ -1132,6 +1138,7 @@ func _physics_process(delta: float) -> void:
 	_tick_events(delta)
 	_tick_fortress_hints()
 	_tick_player_down(delta)
+	_tick_wave_events(delta)
 
 
 func _tick_player_down(delta: float) -> void:
@@ -1152,6 +1159,123 @@ func _tick_player_down(delta: float) -> void:
 	# Medic died or timer ran out → real game over
 	if not is_instance_valid(_medic_npc) or _medic_npc.get("down") or _player_down_t <= 0.0:
 		_finalize_player_death()
+
+
+# ── Mid-wave events ──────────────────────────────────────────────────────────
+
+func _tick_wave_events(delta: float) -> void:
+	if not _mission_active or _build_phase or _game_over:
+		return
+	_wave_events = _wave_events.filter(func(e): return is_instance_valid(e))
+	if _wave_events.size() >= 2:
+		return
+	_wave_event_next_t -= delta
+	if _wave_event_next_t <= 0.0:
+		_spawn_random_wave_event()
+		_wave_event_next_t = randf_range(28.0, 45.0)
+
+
+func _spawn_random_wave_event() -> void:
+	var roll: float = randf()
+	var t: int
+	if roll < 0.40:
+		t = WaveEvent.Type.SUPPLY
+	elif roll < 0.75:
+		t = WaveEvent.Type.GENERATOR
+	else:
+		t = WaveEvent.Type.DOWNED_SOLDIER
+
+	var pos: Vector2
+	match t:
+		WaveEvent.Type.GENERATOR:
+			# Near the fortress south wall (back-line, easier)
+			var perp: Vector2 = Vector2(-_wave_event_dir.y, _wave_event_dir.x)
+			pos = BASE_POS - _wave_event_dir * 130.0 + perp * randf_range(-90.0, 90.0)
+		WaveEvent.Type.SUPPLY:
+			# Out in the danger zone (flanking side of the wave direction)
+			var perp_s: Vector2 = Vector2(-_wave_event_dir.y, _wave_event_dir.x)
+			var side: float = -1.0 if randi() % 2 == 0 else 1.0
+			pos = BASE_POS + perp_s * side * randf_range(380.0, 520.0) \
+					+ _wave_event_dir * randf_range(-120.0, 120.0)
+		WaveEvent.Type.DOWNED_SOLDIER:
+			# In front of the wave, in the fight zone
+			pos = BASE_POS + _wave_event_dir * randf_range(380.0, 520.0)
+		_:
+			pos = BASE_POS
+
+	# Keep inside map
+	pos.x = clampf(pos.x, 80.0, MAP_W - 80.0)
+	pos.y = clampf(pos.y, 80.0, MAP_H - 80.0)
+
+	var ev := WaveEvent.new()
+	ev.global_position = pos
+	ev.setup(t, _player)
+	ev.completed.connect(_on_wave_event_completed)
+	ev.failed.connect(_on_wave_event_failed)
+	add_child(ev)
+	_wave_events.append(ev)
+
+	var lname: String = ev.label
+	_hud.show_npc_announcement("¡EVENTO! " + lname, Color(1.0, 0.80, 0.30))
+	_hud.set_minimap_threat((pos - BASE_POS).normalized())
+
+
+func _on_wave_event_completed(t: int) -> void:
+	match t:
+		WaveEvent.Type.GENERATOR:
+			_biomasa += 25
+			_hud.update_biomasa(_biomasa)
+			_hud.show_npc_announcement("GENERADOR REPARADO  +25 chatarra",
+				Color(0.30, 0.95, 0.55))
+		WaveEvent.Type.SUPPLY:
+			if is_instance_valid(_player) and _player.has_method("add_ammo"):
+				_player.add_ammo(60, 12)
+			_grenade_count = mini(_grenade_count + 2, 10)
+			_hud.update_grenade(_grenade_count, _grenade_mode)
+			_hud.show_npc_announcement("SUMINISTROS RECUPERADOS  +munición +2 granadas",
+				Color(1.00, 0.85, 0.25))
+		WaveEvent.Type.DOWNED_SOLDIER:
+			# Revive one downed ally, else spawn an extra grunt
+			var revived: bool = false
+			for ally in get_tree().get_nodes_in_group("allies"):
+				if is_instance_valid(ally) and ally.get("down") == true and ally.has_method("revive"):
+					ally.revive(80)
+					revived = true
+					break
+			if not revived and _extra_grunts.size() < EXTRA_GRUNT_CAP:
+				_spawn_extra_grunt(_extra_grunts.size())
+			_hud.show_npc_announcement("SOLDADO RESCATADO  +1 aliado",
+				Color(0.55, 1.00, 0.55))
+
+
+func _on_wave_event_failed(t: int) -> void:
+	match t:
+		WaveEvent.Type.GENERATOR:
+			_take_base_damage(80)
+			_hud.show_npc_announcement("GENERADOR DESTRUIDO  -80 base HP",
+				Color(1.0, 0.30, 0.20))
+		WaveEvent.Type.SUPPLY:
+			_hud.show_npc_announcement("SUMINISTROS PERDIDOS",
+				Color(0.85, 0.55, 0.20))
+		WaveEvent.Type.DOWNED_SOLDIER:
+			# The downed soldier dies — small biomasa penalty
+			_biomasa = maxi(0, _biomasa - 10)
+			_hud.update_biomasa(_biomasa)
+			_hud.show_npc_announcement("SOLDADO PERDIDO  -10 chatarra",
+				Color(1.0, 0.40, 0.30))
+
+
+func _take_base_damage(amount: int) -> void:
+	if not is_instance_valid(_fortress):
+		return
+	_base_hp = maxi(0, _base_hp - amount)
+	_fortress.base_hp_pct = float(_base_hp) / 1000.0
+	if _fortress.has_method("on_damaged"):
+		_fortress.on_damaged()
+	shake(8.0)
+	SoundManager.play("damage")
+	if _base_hp == 0:
+		_on_base_destroyed()
 
 func _tick_fortress_hints() -> void:
 	if not is_instance_valid(_fortress) or not is_instance_valid(_player):
@@ -1892,6 +2016,8 @@ func _spawn_wave() -> void:
 	var flank_dir:   String = _adjacent_dir(primary_dir)
 	_announce_wave_direction(primary_dir)
 	_rally_npcs_to(primary_dir)
+	_wave_event_dir    = _DIR_VECTORS.get(primary_dir, Vector2.UP)
+	_wave_event_next_t = randf_range(12.0, 20.0)   # first event after ~15s
 
 	# Vanguard phase: first ~8% of the wave is forced elites (tanks/blindados/
 	# corruptors) so the heavy units arrive first and force you to engage
@@ -2047,6 +2173,11 @@ func _on_wave_complete() -> void:
 	_hud.update_grenade(_grenade_count, false)
 	_hud.update_enemy_progress(0, 0)
 	_hud.set_minimap_threat(Vector2.ZERO)
+	# Clear any in-flight mid-wave events (count as failed but silent)
+	for ev in _wave_events:
+		if is_instance_valid(ev):
+			ev.queue_free()
+	_wave_events.clear()
 	shake(8.0)
 	var reward := 8 + _wave * 2
 	var gen_bonus := 15 if (is_instance_valid(_fortress) and _fortress.has_station(Fortress.StationType.GENERATOR)) else 0
