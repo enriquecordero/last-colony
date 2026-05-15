@@ -10,6 +10,8 @@ var damage:    int     = 10
 var bcolor:    Color   = Color(1.0, 0.95, 0.1)
 var bradius:   float   = 8.0
 var is_flame:  bool    = false   # lanzallamas keeps circular fireball
+var pierce:    int     = 0       # additional enemies the bullet passes through
+var _hit_set:  Dictionary = {}   # enemies already hit (avoid re-damaging same body)
 
 
 func _ready() -> void:
@@ -46,17 +48,26 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_body_entered(body: Node) -> void:
-	if body.has_method("take_damage"):
-		body.take_damage(damage)
-		# collision_mask=2 means only enemies are hit — always show blood
-		if not is_flame:
-			var blood              := HitBlood.new()
-			blood.global_position  = global_position
-			blood.hit_direction    = direction
-			get_parent().add_child(blood)
-		else:
-			var spark              := HitSpark.new()
-			spark.global_position  = global_position
-			spark._color           = bcolor
-			get_parent().add_child(spark)
+	if not body.has_method("take_damage"):
+		queue_free()
+		return
+	# Don't re-hit the same body if pierce keeps us alive
+	var bid: int = body.get_instance_id()
+	if _hit_set.has(bid):
+		return
+	_hit_set[bid] = true
+	body.take_damage(damage)
+	if not is_flame:
+		var blood              := HitBlood.new()
+		blood.global_position  = global_position
+		blood.hit_direction    = direction
+		get_parent().add_child(blood)
+	else:
+		var spark              := HitSpark.new()
+		spark.global_position  = global_position
+		spark._color           = bcolor
+		get_parent().add_child(spark)
+	if pierce > 0:
+		pierce -= 1
+		return
 	queue_free()

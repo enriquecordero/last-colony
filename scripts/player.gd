@@ -393,7 +393,9 @@ func _shoot_rifle() -> void:
 	if "lifetime" in b:
 		b.lifetime = float(b.lifetime) * get_range_mult()
 	if "damage" in b:
-		b.damage = int(int(b.damage) * get_damage_mult())
+		b.damage = int(25 * get_damage_mult())
+	if "pierce" in b:
+		b.pierce = 2
 	bullet_container.add_child(b)
 	_rifle_mag -= 1
 	_emit_ammo()
@@ -408,9 +410,11 @@ func _shoot_shotgun() -> void:
 		b.global_position = global_position
 		b.direction       = base_dir.rotated(randf_range(deg_to_rad(-20.0), deg_to_rad(20.0)))
 		b.lifetime        = 0.45 * get_range_mult()
-		b.damage          = int(15 * get_damage_mult())
+		b.damage          = int(22 * get_damage_mult())
 		b.bcolor          = Color(1.0, 0.55, 0.1)
 		b.bradius         = 5.0
+		if "pierce" in b:
+			b.pierce = 1
 		bullet_container.add_child(b)
 	_shotgun_mag -= 1
 	_emit_ammo()
@@ -423,9 +427,11 @@ func _shoot_sniper() -> void:
 	b.global_position = global_position
 	b.direction = (get_global_mouse_position() - global_position).normalized()
 	b.lifetime  = 4.5 * get_range_mult()
-	b.damage    = int(220 * get_damage_mult())
+	b.damage    = int(280 * get_damage_mult())
 	b.bcolor    = Color(0.80, 0.97, 1.0)
 	b.bradius   = 3.5
+	if "pierce" in b:
+		b.pierce = 4
 	bullet_container.add_child(b)
 	_sniper_mag -= 1
 	_emit_ammo()
@@ -440,10 +446,12 @@ func _shoot_lanzallamas() -> void:
 		b.global_position = global_position
 		b.direction = base_dir.rotated(randf_range(deg_to_rad(-18.0), deg_to_rad(18.0)))
 		b.lifetime  = 0.22 * get_range_mult()
-		b.damage    = int(10 * get_damage_mult())
+		b.damage    = int(14 * get_damage_mult())
 		b.bcolor    = Color(1.0, randf_range(0.20, 0.60), 0.02)
 		b.bradius   = randf_range(5.0, 9.0)
 		b.is_flame  = true
+		if "pierce" in b:
+			b.pierce = 2
 		bullet_container.add_child(b)
 	_flame_fuel -= 1
 	_emit_ammo()
