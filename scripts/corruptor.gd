@@ -5,7 +5,8 @@ var spawns_acid: bool = true
 
 func _ready() -> void:
 	_is_aerial   = true
-	max_hp       = 180
+	max_hp       = 500
+	is_armored   = true
 	melee_damage = 12
 	body_color   = Color(0.52, 0.85, 0.12)
 	body_radius  = 14.0

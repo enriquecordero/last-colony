@@ -67,6 +67,10 @@ func _on_body_entered(body: Node) -> void:
 		spark.global_position  = global_position
 		spark._color           = bcolor
 		get_parent().add_child(spark)
+	# Armored enemies stop the bullet — no pierce through tanks
+	if body.get("is_armored") == true:
+		queue_free()
+		return
 	if pierce > 0:
 		pierce -= 1
 		return

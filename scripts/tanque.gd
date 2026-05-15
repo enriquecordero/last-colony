@@ -1,11 +1,12 @@
 extends "res://scripts/blindado.gd"
 
 func _ready() -> void:
-	max_hp       = 850
-	melee_damage = 65
+	max_hp       = 2400
+	melee_damage = 80
 	body_color   = Color(0.20, 0.28, 0.15)
 	body_radius  = 26.0
-	speed        = 32.0
+	speed        = 28.0
+	is_armored   = true
 	_charge_cd   = 99999.0  # nunca carga
 	super._ready()
 

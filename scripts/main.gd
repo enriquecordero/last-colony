@@ -1893,6 +1893,11 @@ func _spawn_wave() -> void:
 	_announce_wave_direction(primary_dir)
 	_rally_npcs_to(primary_dir)
 
+	# Vanguard phase: first ~8% of the wave is forced elites (tanks/blindados/
+	# corruptors) so the heavy units arrive first and force you to engage
+	# before the horde overruns the line.
+	var vanguard_total: int = mini(maxi(int(float(count) * 0.08), 4), 40)
+
 	for i in count:
 		await get_tree().create_timer(interval).timeout
 		if not _mission_active or not is_instance_valid(self):
@@ -1903,7 +1908,19 @@ func _spawn_wave() -> void:
 				return
 		var e: CharacterBody2D
 		var r := randf()
-		if is_stage3:
+		var is_vanguard: bool = (i < vanguard_total)
+		if is_vanguard:
+			# Force an elite — biased toward what the stage already uses
+			var er := randf()
+			if is_stage3 and er < 0.30:
+				e = TANQUE_SCENE.instantiate();    e.speed = base_spd * 0.28
+			elif er < 0.55:
+				e = BLINDADO_SCENE.instantiate();  e.speed = base_spd * 0.50
+			elif er < 0.80:
+				e = CORRUPTOR_SCENE.instantiate(); e.speed = base_spd * 0.42
+			else:
+				e = ESCUPIDOR_SCENE.instantiate(); e.speed = base_spd * 0.85
+		elif is_stage3:
 			if _wave >= 2 and r < 0.08:
 				e = TANQUE_SCENE.instantiate();     e.speed = base_spd * 0.28
 			elif r < 0.16:

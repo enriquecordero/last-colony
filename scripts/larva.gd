@@ -18,6 +18,7 @@ var bullet_container: Node2D
 var _dmg_cd:          float   = 0.0
 var _wall_dmg_cd:     float   = 0.0
 var _is_aerial:       bool    = false
+var is_armored:       bool    = false   # bullets stop piercing on hit
 var _current_target:  Vector2 = Vector2.ZERO
 
 var _sprite_tex:   String   = ""
