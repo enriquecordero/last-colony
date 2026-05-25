@@ -78,6 +78,7 @@ const MortarScript = preload("res://scripts/mortar.gd")
 const MortarShell  = preload("res://scripts/mortar_shell.gd")
 const OrbitalLaser = preload("res://scripts/orbital_laser.gd")
 const WaveEvent    = preload("res://scripts/wave_event.gd")
+const StratagemDrop = preload("res://scripts/stratagem_drop.gd")
 
 const BUILD_PHASE_TIME := 14.0
 const MAX_TURRETS      := 8
@@ -137,6 +138,25 @@ var _grenade_mode:  bool = false
 var _laser_charges: int  = 2
 var _laser_mode:    bool = false
 var _command_mode:  bool = false   # V: rally NPCs to clicked point
+
+# Stratagems
+const _STRATAGEM_CODES := {
+	"UUDD":   "SUPPLY",
+	"RDLR":   "SENTRY",
+	"LURD":   "AIRSTRIKE",
+	"LURDU":  "REINFORCEMENTS",
+}
+const _STRATAGEM_LABELS := {
+	"SUPPLY":         "REABASTECIMIENTO",
+	"SENTRY":         "TORRETA AUTOMÁTICA",
+	"AIRSTRIKE":      "BOMBARDEO",
+	"REINFORCEMENTS": "REFUERZOS",
+}
+const _STRATAGEM_CD := 35.0   # seconds per stratagem
+var _stratagem_mode:     bool   = false   # typing code
+var _stratagem_target:   String = ""      # awaiting click target
+var _stratagem_code:     String = ""
+var _stratagem_cds:      Dictionary = {}  # name → time until usable
 
 # Mid-wave events
 var _wave_events:        Array = []
@@ -424,6 +444,9 @@ func _input(event: InputEvent) -> void:
 			if _build_mode:
 				_place_structure()
 				get_viewport().set_input_as_handled()
+			elif _stratagem_target != "" and _mission_active:
+				_drop_stratagem_at(get_global_mouse_position())
+				get_viewport().set_input_as_handled()
 			elif _command_mode and _mission_active:
 				_rally_squad_to(get_global_mouse_position())
 				get_viewport().set_input_as_handled()
@@ -469,6 +492,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ESCAPE:
 				if _build_mode:
 					_set_build_mode(false)
+				elif _stratagem_mode or _stratagem_target != "":
+					_cancel_stratagem()
 				else:
 					_toggle_pause()
 			KEY_F:
@@ -485,6 +510,16 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toggle_command_mode()
 			KEY_H:
 				_call_medic_to_player()
+			KEY_TAB:
+				_toggle_stratagem_mode()
+			KEY_UP:
+				if _stratagem_mode: _stratagem_input("U")
+			KEY_DOWN:
+				if _stratagem_mode: _stratagem_input("D")
+			KEY_LEFT:
+				if _stratagem_mode: _stratagem_input("L")
+			KEY_RIGHT:
+				if _stratagem_mode: _stratagem_input("R")
 			KEY_ENTER, KEY_KP_ENTER:
 				if _build_phase: _end_build_phase()
 			KEY_4:
@@ -1149,6 +1184,7 @@ func _physics_process(delta: float) -> void:
 	_tick_fortress_hints()
 	_tick_player_down(delta)
 	_tick_wave_events(delta)
+	_tick_stratagem_cooldowns(delta)
 
 
 func _tick_player_down(delta: float) -> void:
@@ -1910,6 +1946,150 @@ func _on_laser_strike(pos: Vector2, dmg: int, radius: float) -> void:
 	add_child(ef)
 	shake(14.0)
 	SoundManager.play("laser_hit")
+
+
+# ── Stratagems ───────────────────────────────────────────────────────────────
+
+func _toggle_stratagem_mode() -> void:
+	if _stratagem_target != "":
+		_cancel_stratagem()
+		return
+	_stratagem_mode = not _stratagem_mode
+	_stratagem_code = ""
+	if _stratagem_mode:
+		_grenade_mode = false
+		_laser_mode   = false
+		_command_mode = false
+		var codes_help: String = "↑↑↓↓=SUPPLY  →↓←→=SENTRY  ←↑→↓=AIRSTRIKE  ←↑→↓↑=REFUERZOS"
+		_hud.show_npc_announcement("ESTRATAGEMA: tipea código  (%s)" % codes_help,
+			Color(0.85, 0.95, 0.55))
+	else:
+		_hud.show_npc_announcement("CANCELADO", Color(0.55, 0.55, 0.55))
+
+
+func _stratagem_input(letter: String) -> void:
+	_stratagem_code += letter
+	# Check for an exact match
+	if _STRATAGEM_CODES.has(_stratagem_code):
+		var sname: String = _STRATAGEM_CODES[_stratagem_code]
+		_stratagem_mode = false
+		var cd: float = float(_stratagem_cds.get(sname, 0.0))
+		if cd > 0.0:
+			_hud.show_npc_announcement("%s en cooldown (%ds)" % [_STRATAGEM_LABELS[sname], int(ceil(cd))],
+				Color(1.0, 0.4, 0.2))
+			_stratagem_code = ""
+			return
+		_stratagem_target = sname
+		_hud.show_npc_announcement("%s — CLICK PARA MARCAR" % _STRATAGEM_LABELS[sname],
+			Color(1.0, 0.85, 0.30))
+		_stratagem_code = ""
+		return
+	# Check for any prefix; if not, reset
+	var any_prefix: bool = false
+	for c in _STRATAGEM_CODES.keys():
+		if (c as String).begins_with(_stratagem_code):
+			any_prefix = true
+			break
+	if not any_prefix:
+		_stratagem_code = ""
+
+
+func _cancel_stratagem() -> void:
+	_stratagem_mode   = false
+	_stratagem_target = ""
+	_stratagem_code   = ""
+	_hud.show_npc_announcement("ESTRATAGEMA CANCELADA", Color(0.6, 0.6, 0.6))
+
+
+func _drop_stratagem_at(target: Vector2) -> void:
+	var sname: String = _stratagem_target
+	if sname == "":
+		return
+	_stratagem_target = ""
+	_stratagem_cds[sname] = _STRATAGEM_CD
+	var drop := StratagemDrop.new()
+	drop.target = target
+	drop.global_position = target
+	drop.type = _stratagem_type_id(sname)
+	drop.landed.connect(_on_stratagem_landed)
+	add_child(drop)
+	SoundManager.play("laser_warn")
+
+
+func _stratagem_type_id(sname: String) -> int:
+	match sname:
+		"SUPPLY":         return StratagemDrop.Type.SUPPLY
+		"SENTRY":         return StratagemDrop.Type.SENTRY
+		"AIRSTRIKE":      return StratagemDrop.Type.AIRSTRIKE
+		"REINFORCEMENTS": return StratagemDrop.Type.REINFORCEMENTS
+	return StratagemDrop.Type.SUPPLY
+
+
+func _on_stratagem_landed(pos: Vector2, type: int) -> void:
+	match type:
+		StratagemDrop.Type.SUPPLY:
+			if is_instance_valid(_player) and _player.has_method("add_ammo"):
+				_player.add_ammo(90, 18)
+			_grenade_count = mini(_grenade_count + 3, 10)
+			_hud.update_grenade(_grenade_count, _grenade_mode)
+			_hud.update_laser(_laser_charges)
+			_hud.show_npc_announcement("REABASTECIMIENTO RECIBIDO", Color(1.0, 0.85, 0.30))
+			shake(4.0)
+		StratagemDrop.Type.SENTRY:
+			# Place a temporary fortress turret at the drop site
+			var t := TURRET_SCENE.instantiate()
+			t.position         = pos
+			t.hp               = 220
+			t.max_hp           = 220
+			t.bullet_container = _bullets
+			t.enemies_node     = _enemies
+			_walls.add_child(t)
+			# Auto-despawn after 60s (sentry is temporary)
+			var tree := get_tree()
+			tree.create_timer(60.0).timeout.connect(
+				func() -> void:
+					if is_instance_valid(t):
+						t.queue_free())
+			_hud.show_npc_announcement("TORRETA AUTOMÁTICA DESPLEGADA", Color(0.55, 0.85, 1.0))
+			shake(5.0)
+		StratagemDrop.Type.AIRSTRIKE:
+			# 5 explosions in a line through the target
+			var line_dir: Vector2 = (pos - BASE_POS).normalized()
+			if line_dir == Vector2.ZERO:
+				line_dir = Vector2.RIGHT
+			var perp: Vector2 = Vector2(-line_dir.y, line_dir.x)
+			for i in 5:
+				var offset: float = float(i - 2) * 70.0
+				var hit_pos: Vector2 = pos + line_dir * offset
+				_on_mortar_shell_exploded(hit_pos, 140, 90.0)
+			SoundManager.play("laser_hit")
+			shake(12.0)
+		StratagemDrop.Type.REINFORCEMENTS:
+			# Spawn 3 grunts at the drop site, capped at EXTRA_GRUNT_CAP
+			for i in 3:
+				if _extra_grunts.size() >= EXTRA_GRUNT_CAP:
+					break
+				_spawn_extra_grunt(_extra_grunts.size())
+				# Move the most recently added grunt to the drop area
+				var g = _extra_grunts.back()
+				if is_instance_valid(g):
+					var off: Vector2 = Vector2(randf_range(-30, 30), randf_range(-30, 30))
+					g.position = pos + off
+					g.post_pos = pos + off
+			_hud.show_npc_announcement("REFUERZOS DESPLEGADOS", Color(0.45, 1.0, 0.55))
+			shake(6.0)
+
+
+func _tick_stratagem_cooldowns(delta: float) -> void:
+	if _stratagem_cds.is_empty():
+		return
+	for key in _stratagem_cds.keys():
+		var v: float = float(_stratagem_cds[key])
+		v -= delta
+		if v <= 0.0:
+			_stratagem_cds.erase(key)
+		else:
+			_stratagem_cds[key] = v
 
 
 func _on_mortar_shell_exploded(pos: Vector2, dmg: int, radius: float) -> void:
