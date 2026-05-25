@@ -136,6 +136,7 @@ var _grenade_count: int  = 5
 var _grenade_mode:  bool = false
 var _laser_charges: int  = 2
 var _laser_mode:    bool = false
+var _command_mode:  bool = false   # V: rally NPCs to clicked point
 
 # Mid-wave events
 var _wave_events:        Array = []
@@ -423,6 +424,9 @@ func _input(event: InputEvent) -> void:
 			if _build_mode:
 				_place_structure()
 				get_viewport().set_input_as_handled()
+			elif _command_mode and _mission_active:
+				_rally_squad_to(get_global_mouse_position())
+				get_viewport().set_input_as_handled()
 			elif _laser_mode and _mission_active:
 				_fire_orbital_laser(get_global_mouse_position())
 				get_viewport().set_input_as_handled()
@@ -477,6 +481,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toggle_grenade_mode()
 			KEY_L:
 				_toggle_laser_mode()
+			KEY_V:
+				_toggle_command_mode()
+			KEY_H:
+				_call_medic_to_player()
 			KEY_ENTER, KEY_KP_ENTER:
 				if _build_phase: _end_build_phase()
 			KEY_4:
@@ -1816,6 +1824,53 @@ func spawn_mortar_shell(from_pos: Vector2, target_pos: Vector2, dmg: int, radius
 	shell.radius          = radius
 	shell.exploded.connect(_on_mortar_shell_exploded)
 	add_child(shell)
+
+
+func _toggle_command_mode() -> void:
+	_command_mode = not _command_mode
+	if _command_mode:
+		_grenade_mode = false
+		_laser_mode   = false
+		_hud.show_npc_announcement("ÓRDENES: CLICK = RALLY ESCUADRÓN",
+			Color(0.55, 0.95, 0.85))
+	else:
+		_hud.show_npc_announcement("ÓRDENES CANCELADAS", Color(0.55, 0.75, 0.75))
+
+
+func _rally_squad_to(point: Vector2) -> void:
+	_command_mode = false
+	var combat: Array = [_assault_npc, _demo_npc, _engineer_npc]
+	var i: int = 0
+	for n in combat:
+		if is_instance_valid(n):
+			var off: Vector2 = Vector2(randf_range(-50.0, 50.0), randf_range(-50.0, 50.0))
+			n.post_pos = point + off
+			if n == _engineer_npc:
+				n.current_threat_dir = (point - BASE_POS).normalized()
+			i += 1
+	# Sniper stays a bit back from the rally
+	if is_instance_valid(_sniper_npc):
+		var to_point: Vector2 = (point - BASE_POS).normalized()
+		_sniper_npc.post_pos = point - to_point * 80.0
+	# Grunts fan out around the rally
+	for g_i in _extra_grunts.size():
+		var g = _extra_grunts[g_i]
+		if not is_instance_valid(g):
+			continue
+		var ang: float = TAU * float(g_i) / float(maxi(_extra_grunts.size(), 1))
+		g.post_pos = point + Vector2(cos(ang), sin(ang)) * 55.0
+	_hud.show_npc_announcement("¡A LA POSICIÓN!", Color(0.55, 0.95, 0.85))
+	_hud.set_minimap_threat((point - BASE_POS).normalized())
+
+
+func _call_medic_to_player() -> void:
+	if not is_instance_valid(_medic_npc) or _medic_npc.get("down"):
+		_hud.show_npc_announcement("MÉDICO NO DISPONIBLE", Color(1.0, 0.4, 0.2))
+		return
+	if not is_instance_valid(_player):
+		return
+	_medic_npc.post_pos = _player.global_position
+	_hud.show_npc_announcement("MÉDICO EN CAMINO", Color(0.30, 1.0, 0.55))
 
 
 func _toggle_laser_mode() -> void:
