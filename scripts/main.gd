@@ -68,9 +68,9 @@ const SPAWN_POINTS := {
 }
 
 
-const AMMO_DROP_CHANCE  := 0.18
-const AMMO_DROP_RIFLE   := 22
-const AMMO_DROP_SHOTGUN := 4
+const AMMO_DROP_CHANCE  := 0.07
+const AMMO_DROP_RIFLE   := 14
+const AMMO_DROP_SHOTGUN := 3
 
 enum BuildType { WALL, TURRET, WALL_PLUS, MINE, BARRICADA, MORTAR }
 
@@ -2638,7 +2638,8 @@ func _on_enemy_died(e: Node) -> void:
 	shake(shk)
 	_spawn_death_effect(e.global_position, e.body_color, ef_scale)
 	var raw    = e.get("max_hp")
-	var scrap := clampi(int(float(int(raw)) / 10.0), 1, 5) if raw != null else 1
+	# Scrap economy tightened: divisor 10→22, cap 5→3
+	var scrap := clampi(int(float(int(raw)) / 22.0), 1, 3) if raw != null else 1
 	_biomasa  += scrap
 	_hud.update_biomasa(_biomasa)
 	_spawn_scrap_text(e.global_position, scrap)
@@ -2647,21 +2648,21 @@ func _on_enemy_died(e: Node) -> void:
 		_player.add_ammo(AMMO_DROP_RIFLE, AMMO_DROP_SHOTGUN)
 		_spawn_ammo_text(e.global_position)
 
-	# Loot de enemigos grandes
+	# Loot de enemigos grandes — todas las chances bajaron
 	var hp_v: int = int(raw) if raw != null else 0
 
-	if hp_v >= 120 and randf() < 0.05 and is_instance_valid(_player) and _player.has_method("add_rockets"):
+	if hp_v >= 120 and randf() < 0.02 and is_instance_valid(_player) and _player.has_method("add_rockets"):
 		_player.add_rockets(1)
 	if hp_v >= 300:
-		if randf() < 0.45:
-			_drop_crate(e.global_position, Crate.Type.MEDKIT)
-		if randf() < 0.14:
-			_drop_crate(e.global_position + Vector2(randf_range(-35,35), randf_range(-35,35)), Crate.Type.BOMB)
-	elif hp_v >= 100:
 		if randf() < 0.22:
 			_drop_crate(e.global_position, Crate.Type.MEDKIT)
+		if randf() < 0.06:
+			_drop_crate(e.global_position + Vector2(randf_range(-35,35), randf_range(-35,35)), Crate.Type.BOMB)
+	elif hp_v >= 100:
+		if randf() < 0.10:
+			_drop_crate(e.global_position, Crate.Type.MEDKIT)
 	elif hp_v >= 50:
-		if randf() < 0.18:
+		if randf() < 0.08:
 			_drop_crate(e.global_position, Crate.Type.BIOMASA)
 
 	SoundManager.play("death")
