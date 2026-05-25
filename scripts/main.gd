@@ -2381,12 +2381,17 @@ func _on_enemy_died(e: Node) -> void:
 	_hud.update_kills(_kills)
 	_hud.update_enemy_progress(_killed, _wave_total)
 
-	if e.get("spawns_acid") == true:
+	# Acid drops: corruptor always, plus a small chance from any other death
+	var spawn_acid: bool = e.get("spawns_acid") == true or randf() < 0.06
+	if spawn_acid:
 		var pool := AcidPool.new()
 		pool.global_position = e.global_position
 		pool.player          = _get_local_player()
 		if is_instance_valid(_assault_npc):  pool._allies.append(_assault_npc)
 		if is_instance_valid(_medic_npc):    pool._allies.append(_medic_npc)
+		for g in _extra_grunts:
+			if is_instance_valid(g):
+				pool._allies.append(g)
 		add_child(pool)
 
 	var mhp: int = int(e.get("max_hp") if e.get("max_hp") != null else 10)
