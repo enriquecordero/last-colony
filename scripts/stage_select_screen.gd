@@ -153,6 +153,16 @@ func _build() -> void:
 	_coop_btn.pressed.connect(_on_coop_pressed)
 	add_child(_coop_btn)
 
+	# TUTORIAL button — sandbox arena to learn mechanics
+	var tut_btn := Button.new()
+	tut_btn.text = "TUTORIAL / PRUEBAS"
+	tut_btn.add_theme_font_size_override("font_size", 16)
+	tut_btn.size     = Vector2(190, 38)
+	tut_btn.position = Vector2(VIEW_W * 0.5 - 95, VIEW_H - 52)
+	tut_btn.add_theme_color_override("font_color", Color(0.55, 1.0, 0.65))
+	tut_btn.pressed.connect(_on_tutorial_pressed)
+	add_child(tut_btn)
+
 	var missions := StageRegistry.get_stage_missions(_current_stage_id)
 	for m in missions:
 		_build_card(m)
@@ -422,11 +432,18 @@ func _on_deploy_pressed() -> void:
 func _do_deploy() -> void:
 	StageManager.selected_mission_id = _selected_id
 	StageManager.is_multiplayer = false
+	StageManager.is_tutorial    = false
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 func _on_coop_pressed() -> void:
 	StageManager.selected_mission_id = _selected_id
+	StageManager.is_tutorial = false
 	get_tree().change_scene_to_file("res://scenes/lobby.tscn")
+
+func _on_tutorial_pressed() -> void:
+	StageManager.is_tutorial    = true
+	StageManager.is_multiplayer = false
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 func _refresh_nav_buttons() -> void:
 	var idx: int = _STAGE_ORDER.find(_current_stage_id)

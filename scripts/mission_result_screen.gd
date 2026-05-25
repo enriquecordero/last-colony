@@ -206,6 +206,7 @@ func _go_to_hub() -> void:
 		if chatarra > 0:
 			StageManager.bank_chatarra(chatarra)
 	StageManager.selected_mission_id = ""
+	StageManager.is_tutorial = false
 	if is_finale:
 		get_tree().change_scene_to_file("res://scenes/credits.tscn")
 	else:

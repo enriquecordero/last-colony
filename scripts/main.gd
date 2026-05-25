@@ -79,6 +79,7 @@ const MortarShell  = preload("res://scripts/mortar_shell.gd")
 const OrbitalLaser = preload("res://scripts/orbital_laser.gd")
 const WaveEvent    = preload("res://scripts/wave_event.gd")
 const StratagemDrop = preload("res://scripts/stratagem_drop.gd")
+const TutorialOverlay = preload("res://scripts/tutorial_overlay.gd")
 
 const BUILD_PHASE_TIME := 14.0
 const MAX_TURRETS      := 8
@@ -189,10 +190,26 @@ var _generator_station:  CanvasLayer = null
 
 func _ready() -> void:
 	_build_scene()
-	if StageManager.selected_mission_id.is_empty():
+	if StageManager.is_tutorial:
+		_start_tutorial()
+	elif StageManager.selected_mission_id.is_empty():
 		_show_title()
 	else:
 		_start_game()
+
+
+func _start_tutorial() -> void:
+	# Skip title; jump straight into game with relaxed parameters and overlay
+	StageManager.selected_mission_id = "stage1_recon"   # any incursion mission as scaffold
+	_start_game()
+	# Overlay goes on top
+	var ov := TutorialOverlay.new()
+	ov.finished.connect(func() -> void:
+		if is_instance_valid(ov):
+			ov.queue_free())
+	_hud.add_child(ov)
+	_hud.show_npc_announcement("MODO PRUEBAS — base invulnerable",
+		Color(0.55, 1.0, 0.65))
 
 func _build_scene() -> void:
 	var bg := ColorRect.new()
@@ -1312,6 +1329,8 @@ func _on_wave_event_failed(t: int) -> void:
 
 
 func _take_base_damage(amount: int) -> void:
+	if StageManager.is_tutorial:
+		return
 	if not is_instance_valid(_fortress):
 		return
 	_base_hp = maxi(0, _base_hp - amount)
@@ -1349,7 +1368,7 @@ func _tick_camera() -> void:
 		_camera.position = p.global_position
 
 func _tick_base_damage(delta: float) -> void:
-	if _base_hp <= 0 or _game_over:
+	if _base_hp <= 0 or _game_over or StageManager.is_tutorial:
 		return
 	_base_dmg_cd -= delta
 	if _base_dmg_cd > 0.0:

@@ -13,6 +13,7 @@ const META_TREE := {
 }
 
 var is_multiplayer:      bool       = false
+var is_tutorial:         bool       = false
 var selected_mission_id: String     = ""
 var completed_missions:  Array      = []
 var unlocked_rewards:    Array      = []
