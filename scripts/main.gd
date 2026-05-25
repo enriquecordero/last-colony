@@ -246,6 +246,7 @@ func _build_scene() -> void:
 	_hud.update_base_hp(1000)
 	_hud.update_biomasa(0)
 	_hud.update_grenade(_grenade_count, false)
+	_hud.update_laser(_laser_charges)
 	_player.weapon_changed.connect(_hud.update_weapon)
 	_player.ammo_changed.connect(_hud.update_ammo)
 	_player.infection_changed.connect(_on_infection_changed)
@@ -583,6 +584,7 @@ func _rpc_build_phase_start(wave_num: int, grenade_count: int, biomasa: int,
 	_hud.show_build_phase(int(BUILD_PHASE_TIME))
 	_hud.show_upgrades(_upg_speed, _upg_fire, _upg_armor, false, _biomasa)
 	_hud.update_grenade(_grenade_count, false)
+	_hud.update_laser(_laser_charges)
 	_hud.update_biomasa(_biomasa)
 	if is_instance_valid(_player2):
 		_player2.refill_ammo()
@@ -1450,6 +1452,7 @@ func _start_build_phase() -> void:
 	_hud.show_build_phase(int(BUILD_PHASE_TIME))
 	_hud.show_upgrades(_upg_speed, _upg_fire, _upg_armor, _healed_this_phase, _biomasa)
 	_hud.update_grenade(_grenade_count, false)
+	_hud.update_laser(_laser_charges)
 	if StageManager.is_multiplayer and multiplayer.is_server():
 		_rpc_build_phase_start.rpc(_wave, _grenade_count, _biomasa,
 				_upg_speed, _upg_fire, _upg_armor)
@@ -1786,6 +1789,7 @@ func _throw_grenade(target_pos: Vector2) -> void:
 	_grenade_count -= 1
 	_grenade_mode   = false
 	_hud.update_grenade(_grenade_count, false)
+	_hud.update_laser(_laser_charges)
 
 	var g          := Grenade.new()
 	g.target        = target_pos
@@ -1833,6 +1837,8 @@ func _fire_orbital_laser(target_pos: Vector2) -> void:
 	beam.target = target_pos
 	beam.struck.connect(_on_laser_strike)
 	add_child(beam)
+	SoundManager.play("laser_warn")
+	_hud.update_laser(_laser_charges)
 	_hud.show_npc_announcement("¡LÁSER ENTRANTE! (cargas: %d)" % _laser_charges,
 		Color(0.55, 0.85, 1.0))
 
@@ -1848,7 +1854,7 @@ func _on_laser_strike(pos: Vector2, dmg: int, radius: float) -> void:
 	ef.tint     = Color(0.85, 0.95, 1.0)
 	add_child(ef)
 	shake(14.0)
-	SoundManager.play("explode")
+	SoundManager.play("laser_hit")
 
 
 func _on_mortar_shell_exploded(pos: Vector2, dmg: int, radius: float) -> void:
@@ -2171,6 +2177,7 @@ func _on_wave_complete() -> void:
 	_mission_active = false
 	_grenade_mode   = false
 	_hud.update_grenade(_grenade_count, false)
+	_hud.update_laser(_laser_charges)
 	_hud.update_enemy_progress(0, 0)
 	_hud.set_minimap_threat(Vector2.ZERO)
 	# Clear any in-flight mid-wave events (count as failed but silent)

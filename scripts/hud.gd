@@ -35,6 +35,7 @@ var _weapon_lbl:      Label
 var _ammo_lbl:        Label
 var _bomb_lbl:        Label
 var _grenade_lbl:     Label
+var _laser_lbl:       Label
 var _announce_wave:   Label
 var _announce_msg:    Label
 var _go_panel:        Panel
@@ -118,8 +119,11 @@ func _build() -> void:
 	_bomb_lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
 	_grenade_lbl = _lbl("  GRANADA  —", 15)
 	_grenade_lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
+	_laser_lbl = _lbl("  LÁSER ORB.  —", 15)
+	_laser_lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
 	vbox.add_child(_bomb_lbl)
 	vbox.add_child(_grenade_lbl)
+	vbox.add_child(_laser_lbl)
 
 	_infect_lbl = _lbl("", 14)
 	_infect_lbl.add_theme_color_override("font_color", Color(0.75, 0.20, 1.0))
@@ -546,6 +550,14 @@ func update_grenade(count: int, active: bool) -> void:
 	else:
 		_grenade_lbl.text = "  GRANADA  —"
 		_grenade_lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
+
+func update_laser(count: int) -> void:
+	if count > 0:
+		_laser_lbl.text = "◉ LÁSER ORB. [L]  x%d" % count
+		_laser_lbl.add_theme_color_override("font_color", Color(0.55, 0.85, 1.0))
+	else:
+		_laser_lbl.text = "  LÁSER ORB.  —"
+		_laser_lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
 
 func init_minimap(p: Node2D, en: Node2D, fr: Node2D, base: Vector2, m_w: float, m_h: float) -> void:
 	_minimap.init(p, en, fr, base, m_w, m_h)

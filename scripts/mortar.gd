@@ -71,7 +71,7 @@ func _fire(target_pos: Vector2) -> void:
 		return
 	if main_ref.has_method("spawn_mortar_shell"):
 		main_ref.spawn_mortar_shell(global_position, target_pos, SHELL_DAMAGE, SHELL_RADIUS)
-	SoundManager.play("shoot")
+	SoundManager.play("mortar_fire")
 
 
 func take_damage(amount: int) -> void:
