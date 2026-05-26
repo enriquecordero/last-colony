@@ -80,6 +80,7 @@ const OrbitalLaser = preload("res://scripts/orbital_laser.gd")
 const WaveEvent    = preload("res://scripts/wave_event.gd")
 const StratagemDrop = preload("res://scripts/stratagem_drop.gd")
 const TutorialOverlay = preload("res://scripts/tutorial_overlay.gd")
+const TutorialRunner  = preload("res://scripts/tutorial_runner.gd")
 
 const BUILD_PHASE_TIME := 14.0
 const MAX_TURRETS      := 8
@@ -139,6 +140,7 @@ var _grenade_mode:  bool = false
 var _laser_charges: int  = 2
 var _laser_mode:    bool = false
 var _command_mode:  bool = false   # V: rally NPCs to clicked point
+var _tutorial_runner: Node = null
 
 # Stratagems
 const _STRATAGEM_CODES := {
@@ -199,16 +201,21 @@ func _ready() -> void:
 
 
 func _start_tutorial() -> void:
-	# Skip title; jump straight into game with relaxed parameters and overlay
-	StageManager.selected_mission_id = "stage1_recon"   # any incursion mission as scaffold
+	# Skip title; jump straight into game with relaxed parameters
+	StageManager.selected_mission_id = "stage1_recon"
 	_start_game()
-	# Overlay goes on top
-	var ov := TutorialOverlay.new()
-	ov.finished.connect(func() -> void:
-		if is_instance_valid(ov):
-			ov.queue_free())
-	_hud.add_child(ov)
-	_hud.show_npc_announcement("MODO PRUEBAS — base invulnerable",
+	# Force-end build phase so the player isn't stuck waiting 14s
+	if _build_phase:
+		_end_build_phase()
+	_mission_active = false
+	# Step-by-step runner replaces the wave loop
+	_tutorial_runner = TutorialRunner.new()
+	_tutorial_runner.finished.connect(func() -> void:
+		_hud.show_npc_announcement("¡TUTORIAL COMPLETADO!  Andá libre o salí con ESC",
+			Color(0.55, 1.0, 0.65)))
+	_hud.add_child(_tutorial_runner)
+	_tutorial_runner.start(self)
+	_hud.show_npc_announcement("MODO TUTORIAL — base invulnerable",
 		Color(0.55, 1.0, 0.65))
 
 func _build_scene() -> void:
@@ -1916,6 +1923,8 @@ func _rally_squad_to(point: Vector2) -> void:
 		g.post_pos = point + Vector2(cos(ang), sin(ang)) * 55.0
 	_hud.show_npc_announcement("¡A LA POSICIÓN!", Color(0.55, 0.95, 0.85))
 	_hud.set_minimap_threat((point - BASE_POS).normalized())
+	if is_instance_valid(_tutorial_runner):
+		_tutorial_runner.notify_orders_issued()
 
 
 func _call_medic_to_player() -> void:
@@ -1926,6 +1935,8 @@ func _call_medic_to_player() -> void:
 		return
 	_medic_npc.post_pos = _player.global_position
 	_hud.show_npc_announcement("MÉDICO EN CAMINO", Color(0.30, 1.0, 0.55))
+	if is_instance_valid(_tutorial_runner):
+		_tutorial_runner.notify_medic_called()
 
 
 func _toggle_laser_mode() -> void:
@@ -1951,6 +1962,8 @@ func _fire_orbital_laser(target_pos: Vector2) -> void:
 	_hud.update_laser(_laser_charges)
 	_hud.show_npc_announcement("¡LÁSER ENTRANTE! (cargas: %d)" % _laser_charges,
 		Color(0.55, 0.85, 1.0))
+	if is_instance_valid(_tutorial_runner):
+		_tutorial_runner.notify_laser_fired()
 
 
 func _on_laser_strike(pos: Vector2, dmg: int, radius: float) -> void:
@@ -2045,6 +2058,8 @@ func _stratagem_type_id(sname: String) -> int:
 
 
 func _on_stratagem_landed(pos: Vector2, type: int) -> void:
+	if is_instance_valid(_tutorial_runner):
+		_tutorial_runner.notify_stratagem_landed(type)
 	match type:
 		StratagemDrop.Type.SUPPLY:
 			if is_instance_valid(_player) and _player.has_method("add_ammo"):
@@ -2130,6 +2145,8 @@ func _on_grenade_exploded(pos: Vector2) -> void:
 		if is_instance_valid(e) and e.has_method("take_damage"):
 			if e.global_position.distance_to(pos) <= GRENADE_RADIUS:
 				e.take_damage(75)
+	if is_instance_valid(_tutorial_runner):
+		_tutorial_runner.notify_grenade_exploded()
 	var ef     := BombEffect.new()
 	ef.position = pos
 	ef.max_r    = 160.0
@@ -2162,6 +2179,11 @@ func _start_mission() -> void:
 	_check_npc_spawn()
 	SoundManager.play_wave()
 	shake(4.0)
+	if StageManager.is_tutorial:
+		# Tutorial drives its own spawns; suppress wave loop
+		_hud.announce_wave(_wave, "TUTORIAL")
+		_mission_active = false
+		return
 	if _is_beacon_mission():
 		_hud.announce_wave(_wave, "ACTIVA AMBOS SATÉLITES")
 	elif _is_cache_mission():
@@ -2634,6 +2656,8 @@ func _on_enemy_died(e: Node) -> void:
 	_killed += 1
 	_hud.update_kills(_kills)
 	_hud.update_enemy_progress(_killed, _wave_total)
+	if is_instance_valid(_tutorial_runner):
+		_tutorial_runner.notify_enemy_killed(e)
 
 	# Acid drops: corruptor always, plus a small chance from any other death
 	var spawn_acid: bool = e.get("spawns_acid") == true or randf() < 0.06
