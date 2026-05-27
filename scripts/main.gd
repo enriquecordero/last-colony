@@ -207,7 +207,9 @@ func _start_tutorial() -> void:
 	# Force-end build phase so the player isn't stuck waiting 14s
 	if _build_phase:
 		_end_build_phase()
-	_mission_active = false
+	# Keep _mission_active true (set by _start_mission); click handlers for
+	# grenades / stratagems / laser / orders depend on it. Wave spawn is
+	# suppressed by the tutorial branch inside _start_mission.
 	# Step-by-step runner replaces the wave loop
 	_tutorial_runner = TutorialRunner.new()
 	_tutorial_runner.finished.connect(func() -> void:
@@ -681,6 +683,11 @@ func _setup_mission_runtime() -> void:
 
 	if StageManager.is_reward_unlocked("antiserum") and is_instance_valid(_player):
 		_player.serum = true
+
+	# Tutorial mode: skip pre-populate + mission objectives. The tutorial
+	# runner spawns its own scenarios.
+	if StageManager.is_tutorial:
+		return
 
 	_spawn_pre_populate(mission.pre_populate_enemies)
 	_spawn_mission_objects(mission)
@@ -1234,7 +1241,7 @@ func _tick_player_down(delta: float) -> void:
 # ── Mid-wave events ──────────────────────────────────────────────────────────
 
 func _tick_wave_events(delta: float) -> void:
-	if not _mission_active or _build_phase or _game_over:
+	if not _mission_active or _build_phase or _game_over or StageManager.is_tutorial:
 		return
 	_wave_events = _wave_events.filter(func(e): return is_instance_valid(e))
 	if _wave_events.size() >= 2:
@@ -2180,9 +2187,10 @@ func _start_mission() -> void:
 	SoundManager.play_wave()
 	shake(4.0)
 	if StageManager.is_tutorial:
-		# Tutorial drives its own spawns; suppress wave loop
+		# Tutorial drives its own spawns; suppress wave loop but keep
+		# _mission_active true so click handlers (grenade / stratagem /
+		# laser / orders) keep responding.
 		_hud.announce_wave(_wave, "TUTORIAL")
-		_mission_active = false
 		return
 	if _is_beacon_mission():
 		_hud.announce_wave(_wave, "ACTIVA AMBOS SATÉLITES")
