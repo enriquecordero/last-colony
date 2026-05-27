@@ -91,30 +91,34 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
+	# Anchor card to TOP-CENTER so it doesn't overlap the left-side HUD stats
 	_card = Panel.new()
-	_card.size     = Vector2(420, 130)
-	_card.position = Vector2(20, 70)
+	_card.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_card.size     = Vector2(460, 110)
+	_card.position = Vector2(-230, 18)
 	_card.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(_card)
 
 	_title_lbl = Label.new()
-	_title_lbl.size     = Vector2(400, 26)
-	_title_lbl.position = Vector2(14, 10)
-	_title_lbl.add_theme_font_size_override("font_size", 17)
+	_title_lbl.size     = Vector2(440, 24)
+	_title_lbl.position = Vector2(14, 8)
+	_title_lbl.add_theme_font_size_override("font_size", 16)
 	_title_lbl.add_theme_color_override("font_color", Color(0.55, 1.0, 0.65))
 	_card.add_child(_title_lbl)
 
 	_body_lbl = Label.new()
-	_body_lbl.size     = Vector2(400, 90)
-	_body_lbl.position = Vector2(14, 36)
-	_body_lbl.add_theme_font_size_override("font_size", 13)
+	_body_lbl.size     = Vector2(440, 76)
+	_body_lbl.position = Vector2(14, 30)
+	_body_lbl.add_theme_font_size_override("font_size", 12)
 	_body_lbl.add_theme_color_override("font_color", Color(0.85, 0.92, 0.85))
 	_body_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_card.add_child(_body_lbl)
 
+	# Toast appears mid-screen
 	_toast = Label.new()
+	_toast.set_anchors_preset(Control.PRESET_CENTER)
 	_toast.size     = Vector2(640, 36)
-	_toast.position = Vector2(320, 250)
+	_toast.position = Vector2(-320, -18)
 	_toast.add_theme_font_size_override("font_size", 22)
 	_toast.add_theme_color_override("font_color", Color(0.55, 1.0, 0.65))
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
